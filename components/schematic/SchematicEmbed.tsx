@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { SchematicEmbed as SchematicEmbedComponent } from "@schematichq/schematic-components";
+import { SchematicEmbed as SchematicEmbedComponent } from '@schematichq/schematic-components';
 
 const SchematicEmbed = ({
   accessToken,

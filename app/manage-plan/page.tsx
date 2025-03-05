@@ -1,4 +1,4 @@
-import SchematicComponent from "@/components/schematic/SchematicComponent";
+import SchematicComponent from '@/components/schematic/SchematicComponent';
 
 function ManagePlan() {
   return (
@@ -8,7 +8,7 @@ function ManagePlan() {
         Manage your subscription and billing details here.
       </p>
 
-      <SchematicComponent componentId="cmpn_4ShecskXt6P" />
+      <SchematicComponent componentId="cmpn_WcbpVg75war" />
     </div>
   );
 }
