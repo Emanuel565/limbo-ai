@@ -8,6 +8,26 @@ import { currentUser } from "@clerk/nextjs/server";
 import OpenAI from "openai";
 
 const convexClient = getConvexClient();
+const provider = (process.env.AI_PROVIDER ?? "openai").toLowerCase();
+
+function getTitleGenerationClient() {
+  if (provider === "ollama") {
+    return new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY ?? "ollama",
+      baseURL: process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/v1",
+    });
+  }
+
+  const openaiApiKey = process.env.OPENAI_API_KEY;
+
+  if (!openaiApiKey) {
+    throw new Error("OPENAI_API_KEY is not set. Configure it or switch AI_PROVIDER to ollama.");
+  }
+
+  return new OpenAI({
+    apiKey: openaiApiKey,
+  });
+}
 
 export async function titleGeneration(
   videoId: string,
@@ -20,17 +40,17 @@ export async function titleGeneration(
     throw new Error("User not found");
   }
 
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
+  const openai = getTitleGenerationClient();
 
   try {
     console.log("🎯 Video summary:", videoSummary);
     console.log("🎯 Generating title for video for videoId:", videoId);
     console.log("🎯 Considerations:", considerations);
 
+    const model = provider === "ollama" ? process.env.OLLAMA_MODEL ?? "llama3.1:8b" : "gpt-4o-mini";
+
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model,
       messages: [
         {
           role: "system",

@@ -5,18 +5,12 @@ import { SchematicClient } from "@schematichq/schematic-typescript-node";
 
 const apiKey = process.env.SCHEMATIC_API_KEY;
 
-if (!apiKey) {
-  throw new Error("SCHEMATIC_API_KEY is not set");
-}
-
-const client = new SchematicClient({
-  apiKey,
-});
+const client = apiKey ? new SchematicClient({ apiKey }) : null;
 
 export async function getTemporaryAccessToken() {
   const user = await currentUser();
 
-  if (!user) {
+  if (!user || !client) {
     return null;
   }
 

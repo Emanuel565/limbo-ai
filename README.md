@@ -65,6 +65,24 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 The project requires several environment variables to be set up. Check `.env.example` for required configurations.
 
+### Local model with Ollama
+
+To run the chat locally without relying on Anthropic or OpenAI, set:
+
+```bash
+AI_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434/v1
+OLLAMA_MODEL=llama3.1:8b
+```
+
+Then start Ollama locally and pull a model:
+
+```bash
+ollama pull llama3.1:8b
+```
+
+This keeps the chat and title generation in the app using the local model. Image generation still requires a local image-capable model or a cloud OpenAI key, because Ollama does not provide the same DALL-E workflow out of the box.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

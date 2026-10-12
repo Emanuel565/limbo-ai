@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.1.11",
+    "@ai-sdk/openai": "^4.0.91",
     "@ai-sdk/react": "^1.1.18",
     "@clerk/nextjs": "^6.12.1",
     "@radix-ui/react-progress": "^1.1.2",

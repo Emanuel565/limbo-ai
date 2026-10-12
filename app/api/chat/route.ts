@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
 import { streamText, tool } from "ai";
 import { currentUser } from "@clerk/nextjs/server";
 import { getVideoDetails } from "@/actions/getVideoDetails";
@@ -9,14 +10,49 @@ import { z } from "zod";
 import { getVideoIdFromUrl } from "@/lib/getVideoIdFromUrl";
 import generateTitle from "@/tools/generateTitle";
 
-const anthropic = createAnthropic({
-  apiKey: process.env.CLAUDE_API_KEY,
-  headers: {
-    "anthropic-beta": "token-efficient-tools-2025-02-19",
-  },
-});
+const defaultProvider = (process.env.AI_PROVIDER ?? "anthropic").toLowerCase();
 
-const model = anthropic("claude-3-7-sonnet-20250219");
+function getChatModel() {
+  const provider = defaultProvider;
+
+  if (provider === "ollama") {
+    const ollama = createOpenAI({
+      apiKey: "ollama",
+      baseURL: process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/v1",
+    });
+
+    return ollama(process.env.OLLAMA_MODEL ?? "llama3.1");
+  }
+
+  if (provider === "openai") {
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+
+    if (!openaiApiKey) {
+      throw new Error("OPENAI_API_KEY is not set. Configure it or switch AI_PROVIDER to ollama.");
+    }
+
+    const openai = createOpenAI({
+      apiKey: openaiApiKey,
+    });
+
+    return openai(process.env.OPENAI_MODEL ?? "gpt-4o-mini");
+  }
+
+  const claudeApiKey = process.env.CLAUDE_API_KEY;
+
+  if (!claudeApiKey) {
+    throw new Error("CLAUDE_API_KEY is not set. Configure it or switch AI_PROVIDER to ollama.");
+  }
+
+  const anthropic = createAnthropic({
+    apiKey: claudeApiKey,
+    headers: {
+      "anthropic-beta": "token-efficient-tools-2025-02-19",
+    },
+  });
+
+  return anthropic(process.env.CLAUDE_MODEL ?? "claude-3-7-sonnet-20250219");
+}
 
 export async function POST(req: Request) {
   const { messages, videoId } = await req.json();
@@ -24,6 +60,17 @@ export async function POST(req: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let model: any;
+
+  try {
+    model = getChatModel();
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "AI provider configuration error";
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 
   const videoDetails = await getVideoDetails(videoId);

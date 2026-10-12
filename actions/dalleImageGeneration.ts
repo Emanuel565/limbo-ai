@@ -9,6 +9,26 @@ import OpenAI from "openai";
 
 const IMAGE_SIZE = "1792x1024" as const;
 const convexClient = getConvexClient();
+const provider = (process.env.AI_PROVIDER ?? "openai").toLowerCase();
+
+function getImageGenerationClient() {
+  if (provider === "ollama") {
+    return new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY ?? "ollama",
+      baseURL: process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/v1",
+    });
+  }
+
+  const openaiApiKey = process.env.OPENAI_API_KEY;
+
+  if (!openaiApiKey) {
+    throw new Error("OPENAI_API_KEY is not set. Configure it or switch AI_PROVIDER to ollama with a local image model.");
+  }
+
+  return new OpenAI({
+    apiKey: openaiApiKey,
+  });
+}
 
 export const dalleImageGeneration = async (prompt: string, videoId: string) => {
   const user = await currentUser();
@@ -17,9 +37,13 @@ export const dalleImageGeneration = async (prompt: string, videoId: string) => {
     throw new Error("User not found");
   }
 
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
+  if (provider === "ollama") {
+    throw new Error(
+      "Image generation is not available in Ollama mode without a local image model. Set AI_PROVIDER=openai with OPENAI_API_KEY to keep this feature enabled."
+    );
+  }
+
+  const openai = getImageGenerationClient();
 
   if (!prompt) {
     throw new Error("Failed to generate image prompt");
