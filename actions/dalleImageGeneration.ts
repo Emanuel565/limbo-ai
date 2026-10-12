@@ -4,12 +4,11 @@ import { api } from "@/convex/_generated/api";
 import { FeatureFlag, featureFlagEvents } from "@/features/flags";
 import { getConvexClient } from "@/lib/convex";
 import { client } from "@/lib/schematic";
-import { currentUser } from "@clerk/nextjs/server";
 import OpenAI from "openai";
 
 const IMAGE_SIZE = "1792x1024" as const;
 const convexClient = getConvexClient();
-const provider = (process.env.AI_PROVIDER ?? "openai").toLowerCase();
+const provider = (process.env.AI_PROVIDER ?? "ollama").toLowerCase();
 
 function getImageGenerationClient() {
   if (provider === "ollama") {
@@ -30,12 +29,12 @@ function getImageGenerationClient() {
   });
 }
 
-export const dalleImageGeneration = async (prompt: string, videoId: string) => {
-  const user = await currentUser();
-
-  if (!user?.id) {
-    throw new Error("User not found");
-  }
+export const dalleImageGeneration = async (
+  prompt: string,
+  videoId: string,
+  userId: string = "local-user"
+) => {
+  const resolvedUserId = userId || "local-user";
 
   if (provider === "ollama") {
     throw new Error(
@@ -93,24 +92,24 @@ export const dalleImageGeneration = async (prompt: string, videoId: string) => {
   await convexClient.mutation(api.images.storeImage, {
     storageId: storageId,
     videoId,
-    userId: user.id,
+    userId: resolvedUserId,
   });
   console.log("✅ Saved image reference to database");
 
   // get serve image url
   const dbImageUrl = await convexClient.query(api.images.getImage, {
     videoId,
-    userId: user.id,
+    userId: resolvedUserId,
   });
 
   // Track the image generation event
   await client.track({
     event: featureFlagEvents[FeatureFlag.IMAGE_GENERATION].event,
     company: {
-      id: user.id,
+      id: resolvedUserId,
     },
     user: {
-      id: user.id,
+      id: resolvedUserId,
     },
   });
 

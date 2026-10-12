@@ -1,111 +1,128 @@
 import { NextResponse } from "next/server";
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { createOpenAI } from "@ai-sdk/openai";
-import { streamText, tool } from "ai";
-import { currentUser } from "@clerk/nextjs/server";
 import { getVideoDetails } from "@/actions/getVideoDetails";
-import fetchTranscript from "@/tools/fetchTranscript";
-import { generateImage } from "@/tools/generateImage";
-import { z } from "zod";
-import { getVideoIdFromUrl } from "@/lib/getVideoIdFromUrl";
-import generateTitle from "@/tools/generateTitle";
 
-const defaultProvider = (process.env.AI_PROVIDER ?? "anthropic").toLowerCase();
+const defaultProvider = (process.env.AI_PROVIDER ?? "ollama").toLowerCase();
 
-function getChatModel() {
-  const provider = defaultProvider;
+function getOllamaBaseUrl() {
+  const raw = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
+  return raw.replace(/\/v1\/?$/, "");
+}
 
-  if (provider === "ollama") {
-    const ollama = createOpenAI({
-      apiKey: "ollama",
-      baseURL: process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/v1",
-    });
+function getOllamaModelCandidates() {
+  const preferred = process.env.OLLAMA_MODEL ?? "llama3.2:3b-instruct";
+  const fallback = process.env.OLLAMA_FALLBACK_MODEL ?? "qwen2.5:3b";
 
-    return ollama(process.env.OLLAMA_MODEL ?? "llama3.1");
-  }
+  return Array.from(new Set([preferred, fallback].filter(Boolean))) as string[];
+}
 
-  if (provider === "openai") {
-    const openaiApiKey = process.env.OPENAI_API_KEY;
+async function callOllamaChat(messages: Array<{ role: string; content: string }>) {
+  const ollamaUrl = `${getOllamaBaseUrl()}/api/chat`;
+  let lastError: unknown;
 
-    if (!openaiApiKey) {
-      throw new Error("OPENAI_API_KEY is not set. Configure it or switch AI_PROVIDER to ollama.");
+  for (const model of getOllamaModelCandidates()) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const response = await fetch(ollamaUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          stream: false,
+          options: {
+            temperature: 0.2,
+            num_predict: 220,
+            top_p: 0.9,
+            num_ctx: 4096,
+          },
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || `Ollama model ${model} failed`);
+      }
+
+      return data;
+    } catch (error) {
+      lastError = error;
     }
-
-    const openai = createOpenAI({
-      apiKey: openaiApiKey,
-    });
-
-    return openai(process.env.OPENAI_MODEL ?? "gpt-4o-mini");
   }
 
-  const claudeApiKey = process.env.CLAUDE_API_KEY;
-
-  if (!claudeApiKey) {
-    throw new Error("CLAUDE_API_KEY is not set. Configure it or switch AI_PROVIDER to ollama.");
-  }
-
-  const anthropic = createAnthropic({
-    apiKey: claudeApiKey,
-    headers: {
-      "anthropic-beta": "token-efficient-tools-2025-02-19",
-    },
-  });
-
-  return anthropic(process.env.CLAUDE_MODEL ?? "claude-3-7-sonnet-20250219");
+  throw lastError instanceof Error ? lastError : new Error("Ollama request failed");
 }
 
 export async function POST(req: Request) {
-  const { messages, videoId } = await req.json();
-  const user = await currentUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  let model: any;
-
   try {
-    model = getChatModel();
+    const body = await req.json().catch(() => ({}));
+    const { messages, videoId } = body;
+
+    if (!videoId || !Array.isArray(messages)) {
+      return NextResponse.json(
+        { error: "Missing videoId or messages in the request body." },
+        { status: 400 }
+      );
+    }
+
+    let safeVideoTitle = "Selected Video";
+    try {
+      const details = await getVideoDetails(videoId);
+      safeVideoTitle = details?.title || safeVideoTitle;
+    } catch {
+      // Ignore video metadata failures and keep the local experience working.
+    }
+
+    const systemMessage = `You are an AI agent ready to accept questions from the user about ONE specific video. The video ID in question is ${videoId} but you'll refer to this as ${safeVideoTitle}. Answer in Brazilian Portuguese. Use a professional YouTube analysis style with clear headings whenever the user asks for analysis. Structure the answer with: Score de engajamento (0-100), Pontos fortes, Pontos fracos, Recomendação de melhoria. Use concise but strategic language, and keep the tone useful for creators and content strategy decisions. If an error occurs, explain it clearly and ask the user to try again later.`;
+
+    const provider = defaultProvider;
+    const requestMessages = [{ role: "system", content: systemMessage }, ...messages];
+
+    if (provider === "openai") {
+      const apiKey = process.env.OPENAI_API_KEY;
+
+      if (!apiKey) {
+        return NextResponse.json(
+          { error: "OPENAI_API_KEY is not set. Configure it or switch AI_PROVIDER to ollama." },
+          { status: 500 }
+        );
+      }
+
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+          messages: requestMessages,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error?.message || "OpenAI request failed");
+      }
+
+      const text = data?.choices?.[0]?.message?.content ?? "";
+      return NextResponse.json({ text });
+    }
+
+    const data = await callOllamaChat(requestMessages);
+    const text = data?.message?.content ?? data?.choices?.[0]?.message?.content ?? "";
+    return NextResponse.json({ text });
   } catch (error) {
+    console.error("Chat API failed:", error);
     const message =
-      error instanceof Error ? error.message : "AI provider configuration error";
+      error instanceof Error ? error.message : "Unexpected server error";
 
     return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const videoDetails = await getVideoDetails(videoId);
-
-  const systemMessage = `You are an AI agent ready to accept questions from the user about ONE specific video. The video ID in question is ${videoId} but you'll refer to this as ${videoDetails?.title || "Selected Video"}. Use emojis to make the conversation more engaging. If an error occurs, explain it to the user and ask them to try again later. If the error suggest the user upgrade, explain that they must upgrade to use the feature, tell them to go to 'Manage Plan' in the header and upgrade. If any tool is used, analyse the response and if it contains a cache, explain that the transcript is cached because they previously transcribed the video saving the user a token - use words like database instead of cache to make it more easy to understand. Format for notion.`;
-
-  const result = streamText({
-    model,
-    messages: [{ role: "system", content: systemMessage }, ...messages],
-    tools: {
-      fetchTranscript: fetchTranscript,
-      generateTitle: generateTitle,
-      generateImage: generateImage(videoId, user.id),
-      getVideoDetails: tool({
-        description: "Get the details of a YouTube video",
-        parameters: z.object({
-          videoId: z.string().describe("The video ID to get the details for"),
-        }),
-        execute: async ({ videoId }) => {
-          const videoDetails = await getVideoDetails(videoId);
-          return { videoDetails };
-        },
-      }),
-      extractVideoId: tool({
-        description: "Extract the video ID from a URL",
-        parameters: z.object({
-          url: z.string().describe("The URL to extract the video ID from"),
-        }),
-        execute: async ({ url }) => {
-          const videoId = await getVideoIdFromUrl(url);
-          return { videoId };
-        },
-      }),
-    },
-  });
-
-  return result.toDataStreamResponse();
 }

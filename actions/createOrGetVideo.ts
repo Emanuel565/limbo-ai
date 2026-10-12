@@ -6,7 +6,6 @@ import { FeatureFlag, featureFlagEvents } from "@/features/flags";
 import { checkFeatureUsageLimit } from "@/lib/checkFeatureUsageLimit";
 import { getConvexClient } from "@/lib/convex";
 import { client } from "@/lib/schematic";
-import { currentUser } from "@clerk/nextjs/server";
 
 export interface VideoResponse {
   success: boolean;
@@ -16,20 +15,26 @@ export interface VideoResponse {
 
 export const createOrGetVideo = async (
   videoId: string,
-  userId: string
+  userId: string = "local-user"
 ): Promise<VideoResponse> => {
-  const convex = getConvexClient();
-  const user = await currentUser();
+  const resolvedUserId = userId || "local-user";
 
-  if (!user) {
+  if (!process.env.NEXT_PUBLIC_CONVEX_URL) {
     return {
-      success: false,
-      error: "User not found",
+      success: true,
+      data: {
+        _id: `local-${videoId}`,
+        _creationTime: Date.now(),
+        videoId,
+        userId: resolvedUserId,
+      } as Doc<"videos">,
     };
   }
 
+  const convex = getConvexClient();
+
   const featureCheck = await checkFeatureUsageLimit(
-    user.id,
+    resolvedUserId,
     featureFlagEvents[FeatureFlag.ANALYSE_VIDEO].event
   );
 
@@ -43,33 +48,33 @@ export const createOrGetVideo = async (
   try {
     const video = await convex.query(api.videos.getVideoById, {
       videoId,
-      userId,
+      userId: resolvedUserId,
     });
 
     if (!video) {
       // Analyse event
       console.log(
-        `🔍 Analyse event for video ${videoId} - Token will be spent`
+        `🔍 Analyse event for video ${videoId} - local AI mode active, no external token purchase required`
       );
 
       const newVideoId = await convex.mutation(api.videos.createVideoEntry, {
         videoId,
-        userId,
+        userId: resolvedUserId,
       });
 
       const newVideo = await convex.query(api.videos.getVideoById, {
         videoId: newVideoId,
-        userId,
+        userId: resolvedUserId,
       });
 
       console.log("Tracking analyse video event...");
       await client.track({
         event: featureFlagEvents[FeatureFlag.ANALYSE_VIDEO].event,
         company: {
-          id: userId,
+          id: resolvedUserId,
         },
         user: {
-          id: userId,
+          id: resolvedUserId,
         },
       });
 
@@ -78,7 +83,7 @@ export const createOrGetVideo = async (
         data: newVideo!,
       };
     } else {
-      console.log("Video exists - no token needs to be spent");
+      console.log("Video exists - local AI mode, no extra token usage required");
       return {
         success: true,
         data: video,

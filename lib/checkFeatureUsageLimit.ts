@@ -5,6 +5,10 @@ export async function checkFeatureUsageLimit(
   userId: string,
   eventSubtype: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (!process.env.SCHEMATIC_API_KEY) {
+    return { success: true };
+  }
+
   try {
     const entitlements = await client.entitlements.getFeatureUsageByCompany({
       keys: {

@@ -30,13 +30,19 @@ function YoutubeVideoDetails({ videoId }: { videoId: string }) {
       <div className="flex flex-col gap-8">
         {/* Video Thumbnail */}
         <div className="flex-shrink-0">
-          <Image
-            src={video.thumbnail}
-            alt={video.title}
-            width={500}
-            height={500}
-            className="w-full rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300"
-          />
+          {video.thumbnail ? (
+            <Image
+              src={video.thumbnail}
+              alt={video.title}
+              width={500}
+              height={500}
+              className="w-full rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300"
+            />
+          ) : (
+            <div className="w-full rounded-xl bg-slate-200 flex items-center justify-center text-slate-600 text-sm font-medium h-60">
+              Miniatura indisponível
+            </div>
+          )}
         </div>
 
         {/* Video Details */}
@@ -47,13 +53,19 @@ function YoutubeVideoDetails({ videoId }: { videoId: string }) {
 
           {/* Channel Info */}
           <div className="flex items-center gap-4">
-            <Image
-              src={video.channel.thumbnail}
-              alt={video.channel.title}
-              width={48}
-              height={48}
-              className="w-10 h-10 @md:w-12 @md:h-12 rounded-full border-2 border-gray-100"
-            />
+            {video.channel.thumbnail ? (
+              <Image
+                src={video.channel.thumbnail}
+                alt={video.channel.title}
+                width={48}
+                height={48}
+                className="w-10 h-10 @md:w-12 @md:h-12 rounded-full border-2 border-gray-100"
+              />
+            ) : (
+              <div className="w-10 h-10 @md:w-12 @md:h-12 rounded-full border-2 border-gray-100 bg-slate-200 flex items-center justify-center text-xs text-slate-600 font-bold">
+                {video.channel.title.slice(0, 2).toUpperCase()}
+              </div>
+            )}
 
             <div>
               <p className="text-base @md:text-lg font-semibold text-gray-900">

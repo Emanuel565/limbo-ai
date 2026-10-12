@@ -1,6 +1,5 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import Usage from "./Usage";
 import { FeatureFlag } from "@/features/flags";
 import Image from "next/image";
@@ -8,19 +7,17 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 function ThumbnailGeneration({ videoId }: { videoId: string }) {
-  const { user } = useUser();
-
   const images = useQuery(api.images.getImages, {
     videoId,
-    userId: user?.id ?? "",
+    userId: "local-user",
   });
 
   return (
-    <div className="rounded-xl flex flex-col p-4 border">
+    <div className="rounded-xl flex flex-col p-4 border border-slate-800 bg-slate-950">
       <div className="min-w-52">
         <Usage
           featureFlag={FeatureFlag.IMAGE_GENERATION}
-          title="Thumbnail Generation"
+          title="Geração de miniaturas"
         />
       </div>
 
@@ -35,7 +32,7 @@ function ThumbnailGeneration({ videoId }: { videoId: string }) {
               >
                 <Image
                   src={image.url}
-                  alt="Generated Image"
+                  alt="Imagem gerada"
                   width={200}
                   height={200}
                   className="object-cover"
@@ -47,10 +44,10 @@ function ThumbnailGeneration({ videoId }: { videoId: string }) {
 
       {/* No images generated yet */}
       {!images?.length && (
-        <div className="text-center py-8 px-4 rounded-lg mt-4 border-2 border-dashed border-gray-200">
-          <p className="text-gray-500">No thumbnails have been generated yet</p>
-          <p className="text-sm text-gray-400 mt-1">
-            Generate thumbnails to see them appear here
+        <div className="text-center py-8 px-4 rounded-lg mt-4 border-2 border-dashed border-slate-700">
+          <p className="text-slate-300">Ainda não há miniaturas geradas</p>
+          <p className="text-sm text-slate-400 mt-1">
+            Gere miniaturas para vê-las aparecer aqui
           </p>
         </div>
       )}

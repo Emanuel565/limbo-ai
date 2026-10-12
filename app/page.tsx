@@ -10,92 +10,91 @@ import {
 
 const steps = [
   {
-    title: "1. Connect Your Content",
-    description: "Share your YouTube video URL and let your agent get to work",
+    title: "1. Conecte seu conteúdo",
+    description: "Compartilhe a URL do seu vídeo e deixe seu agente trabalhar.",
     icon: Video,
   },
   {
-    title: "2. AI Agent Analysis",
-    description: "Your personal agent analyzes every aspect of your content",
+    title: "2. Análise com IA",
+    description: "Seu agente analisa cada detalhe do seu conteúdo.",
     icon: Brain,
   },
   {
-    title: "3. Receive Intelligence",
-    description: "Get actionable insights and strategic recommendations",
+    title: "3. Receba inteligência",
+    description: "Obtenha insights práticos e recomendações estratégicas.",
     icon: MessageSquare,
   },
 ];
 
 const features = [
   {
-    title: "AI Analysis",
+    title: "Análise com IA",
     description:
-      "Get deep insights into your video content with our advanced AI analysis. Understand viewer engagement and content quality.",
+      "Entenda melhor o desempenho do seu vídeo com inteligência artificial para métricas, engajamento e qualidade do conteúdo.",
     icon: Brain,
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
+    iconBg: "bg-blue-900/60",
+    iconColor: "text-blue-300",
   },
   {
-    title: "Smart Transcription",
+    title: "Transcrição inteligente",
     description:
-      "Get accurate transcriptions of your videos. Perfect for creating subtitles, blog posts, or repurposing content.",
+      "Gere transcrições precisas para criar legendas, posts, artigos e reaproveitamento de conteúdo.",
     icon: MessageSquare,
-    iconBg: "bg-green-100",
-    iconColor: "text-green-600",
+    iconBg: "bg-emerald-900/60",
+    iconColor: "text-emerald-300",
   },
   {
-    title: "Thumbnail Generation",
+    title: "Geração de miniaturas",
     description:
-      "Generate eye-catching thumbnails using AI. Boost your click-through rates with compelling visuals.",
+      "Crie miniaturas visualmente fortes com IA e aumente seu CTR com imagens que chamam atenção.",
     icon: ImageIcon,
-    iconBg: "bg-purple-100",
-    iconColor: "text-purple-600",
+    iconBg: "bg-violet-900/60",
+    iconColor: "text-violet-300",
   },
   {
-    title: "Title Generation",
+    title: "Geração de títulos",
     description:
-      "Create attention-grabbing, SEO-optimized titles for your videos using AI. Maximize views with titles that resonate with your audience.",
+      "Crie títulos SEO-friendly e impactantes para seu canal, com foco em alcance e retenção.",
     icon: MessageSquare,
-    iconBg: "bg-yellow-100",
-    iconColor: "text-yellow-600",
+    iconBg: "bg-amber-900/60",
+    iconColor: "text-amber-300",
   },
   {
-    title: "Shot Script",
+    title: "Roteiro de gravação",
     description:
-      "Get detailed, step-by-step instructions to recreate viral videos. Learn shooting techniques, angles, and editing tips from successful content.",
+      "Receba instruções detalhadas para reproduzir vídeos virais com técnicas, ângulos e estrutura de edição.",
     icon: Video,
-    iconBg: "bg-red-100",
-    iconColor: "text-red-600",
+    iconBg: "bg-rose-900/60",
+    iconColor: "text-rose-300",
   },
   {
-    title: "Discuss with Your AI Agent",
+    title: "Converse com sua IA",
     description:
-      "Engage in deep conversations about your content strategy, brainstorm ideas, and unlock new creative possibilities with your AI agent companion.",
+      "Faça perguntas, brainstorms e estratégias de conteúdo em uma conversa natural com seu agente de IA.",
     icon: Sparkles,
-    iconBg: "bg-orange-100",
-    iconColor: "text-orange-600",
+    iconBg: "bg-orange-900/60",
+    iconColor: "text-orange-300",
   },
 ];
 
 export default function Home() {
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="py-20 bg-gradient-to-b from-white to-gray-50">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <section className="py-20 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
         <div className="container mx-auto px-4">
           <div className="flex flex-col items-center gap-10 text-center mb-12">
             <AgentPulse size="large" color="blue" />
 
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-              Meet Your Personal{" "}
-              <span className="bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
-                AI Content Agent
+            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
+              Seu agente pessoal de IA para
+              <span className="block bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
+                conteúdo do YouTube
               </span>
             </h1>
 
-            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-              Transform your video content with AI-powered analysis,
-              transcription, and insights. Get started in seconds.
+            <p className="text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
+              Transforme seus vídeos em estratégia, com análise, transcrição e
+              insights inteligentes em poucos segundos.
             </p>
 
             <YoutubeVideoForm />
@@ -103,20 +102,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-slate-950">
         <div className="container mx-auto px-4 max-w-6xl">
-          <h2 className="text-3xl font-bold text-center mb-12">
-            Powerful Features for Content Creators
+          <h2 className="text-3xl font-bold text-center mb-12 text-white">
+            Recursos poderosos para criadores
           </h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* features */}
             {features.map((feature, index) => {
               const Icon = feature.icon;
               return (
                 <div
                   key={index}
-                  className="bg-white p-6 rounded-xl border border-gray-200 hover:border-blue-500 transition-all duration-300"
+                  className="bg-slate-900/80 p-6 rounded-xl border border-slate-800 hover:border-blue-500 transition-all duration-300 shadow-lg shadow-slate-950/30"
                 >
                   <div
                     className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${feature.iconBg}`}
@@ -124,10 +121,10 @@ export default function Home() {
                     <Icon className={`w-6 h-6 ${feature.iconColor}`} />
                   </div>
 
-                  <h3 className="text-xl font-semibold mb-2">
+                  <h3 className="text-xl font-semibold mb-2 text-white">
                     {feature.title}
                   </h3>
-                  <p className="text-gray-600">{feature.description}</p>
+                  <p className="text-slate-300">{feature.description}</p>
                 </div>
               );
             })}
@@ -135,11 +132,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How it works sections */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-20 bg-slate-900/80">
         <div className="container mx-auto px-4 max-w-6xl">
-          <h2 className="text-3xl font-bold text-center mb-12">
-            Meet Your AI Agent in 3 Simple Steps
+          <h2 className="text-3xl font-bold text-center mb-12 text-white">
+            Seu agente em 3 passos simples
           </h2>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -148,13 +144,15 @@ export default function Home() {
               return (
                 <div
                   key={index}
-                  className="text-center p-6 rounded-xl bg-white shadow-md hover:shadow-lg transition-all"
+                  className="text-center p-6 rounded-xl bg-slate-900 border border-slate-800 shadow-md hover:shadow-lg transition-all"
                 >
-                  <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Icon className="w-8 h-8 text-white" />
                   </div>
-                  <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
-                  <p className="text-gray-600">{step.description}</p>
+                  <h3 className="text-xl font-semibold mb-2 text-white">
+                    {step.title}
+                  </h3>
+                  <p className="text-slate-300">{step.description}</p>
                 </div>
               );
             })}
@@ -162,14 +160,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer section */}
-      <section className="py-20 px-4 md:px-0 bg-gradient-to-r from-blue-600 to-blue-400">
+      <section className="py-20 px-4 md:px-0 bg-gradient-to-r from-blue-600 to-cyan-500">
         <div className="text-center">
           <h2 className="text-3xl font-bold text-white mb-6">
-            Ready to Meet Your AI Content Agent?
+            Pronto para conhecer seu agente de IA?
           </h2>
           <p className="text-xl text-blue-50">
-            Join creators leveraging AI to unlock content insights
+            Criadores usam IA para transformar conteúdo em vantagem competitiva.
           </p>
         </div>
       </section>

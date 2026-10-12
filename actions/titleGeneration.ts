@@ -4,11 +4,10 @@ import { api } from "@/convex/_generated/api";
 import { FeatureFlag, featureFlagEvents } from "@/features/flags";
 import { getConvexClient } from "@/lib/convex";
 import { client } from "@/lib/schematic";
-import { currentUser } from "@clerk/nextjs/server";
 import OpenAI from "openai";
 
 const convexClient = getConvexClient();
-const provider = (process.env.AI_PROVIDER ?? "openai").toLowerCase();
+const provider = (process.env.AI_PROVIDER ?? "ollama").toLowerCase();
 
 function getTitleGenerationClient() {
   if (provider === "ollama") {
@@ -32,13 +31,10 @@ function getTitleGenerationClient() {
 export async function titleGeneration(
   videoId: string,
   videoSummary: string,
-  considerations: string
+  considerations: string,
+  userId: string = "local-user"
 ) {
-  const user = await currentUser();
-
-  if (!user?.id) {
-    throw new Error("User not found");
-  }
+  const resolvedUserId = userId || "local-user";
 
   const openai = getTitleGenerationClient();
 
@@ -77,17 +73,17 @@ export async function titleGeneration(
 
     await convexClient.mutation(api.titles.generate, {
       videoId,
-      userId: user.id,
+      userId: resolvedUserId,
       title: title,
     });
 
     await client.track({
       event: featureFlagEvents[FeatureFlag.TITLE_GENERATIONS].event,
       company: {
-        id: user.id,
+        id: resolvedUserId,
       },
       user: {
-        id: user.id,
+        id: resolvedUserId,
       },
     });
 

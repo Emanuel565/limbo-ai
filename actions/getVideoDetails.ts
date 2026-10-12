@@ -3,16 +3,61 @@
 import { google } from "googleapis";
 import { VideoDetails } from "@/types/types";
 
-const youtube = google.youtube({
-  version: "v3",
-  auth: process.env.YOUTUBE_API_KEY,
-});
+const youtube = process.env.YOUTUBE_API_KEY
+  ? google.youtube({
+      version: "v3",
+      auth: process.env.YOUTUBE_API_KEY,
+    })
+  : null;
+
+async function getFallbackVideoDetails(videoId: string): Promise<VideoDetails | null> {
+  try {
+    const url = `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`;
+    const response = await fetch(url, { cache: "no-store" });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json() as {
+      title?: string;
+      author_name?: string;
+      thumbnail_url?: string;
+      html?: string;
+    };
+
+    if (!data.title) {
+      return null;
+    }
+
+    return {
+      title: data.title,
+      thumbnail: data.thumbnail_url || "",
+      publishedAt: new Date().toISOString(),
+      views: "0",
+      likes: "0",
+      comments: "0",
+      channel: {
+        title: data.author_name || "Canal desconhecido",
+        thumbnail: "",
+        subscribers: "0",
+      },
+    };
+  } catch (error) {
+    console.error("❌ Error fetching fallback YouTube metadata:", error);
+    return null;
+  }
+}
 
 export async function getVideoDetails(videoId: string) {
   console.log("🎥 Fetching video details for:", videoId);
 
   try {
-    // Fetch video details and channel details
+    if (!youtube) {
+      console.log("⚠️ No YouTube API key configured, using public oEmbed fallback");
+      return await getFallbackVideoDetails(videoId);
+    }
+
     const videoResponse = await youtube.videos.list({
       part: ["statistics", "snippet"],
       id: [videoId],
@@ -22,7 +67,6 @@ export async function getVideoDetails(videoId: string) {
 
     if (!videoDetails) throw new Error("Video not found");
 
-    // Get channel details including thumbnail
     const channelResponse = await youtube.channels.list({
       part: ["snippet", "statistics"],
       id: [videoDetails.snippet?.channelId || ""],
@@ -34,7 +78,6 @@ export async function getVideoDetails(videoId: string) {
     console.log("✅ Video details fetched successfully");
 
     const video: VideoDetails = {
-      // Video Info
       title: videoDetails.snippet?.title || "Unknown Title",
       thumbnail:
         videoDetails.snippet?.thumbnails?.maxres?.url ||
@@ -43,13 +86,9 @@ export async function getVideoDetails(videoId: string) {
         "",
       publishedAt:
         videoDetails.snippet?.publishedAt || new Date().toISOString(),
-
-      // Video Metrics
       views: videoDetails.statistics?.viewCount || "0",
       likes: videoDetails.statistics?.likeCount || "Not Available",
       comments: videoDetails.statistics?.commentCount || "Not Available",
-
-      // Channel Info
       channel: {
         title: videoDetails.snippet?.channelTitle || "Unknown Channel",
         thumbnail: channelDetails?.snippet?.thumbnails?.default?.url || "",
@@ -60,6 +99,6 @@ export async function getVideoDetails(videoId: string) {
     return video;
   } catch (error) {
     console.error("❌ Error fetching video details:", error);
-    return null;
+    return await getFallbackVideoDetails(videoId);
   }
 }

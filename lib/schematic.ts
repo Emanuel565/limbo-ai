@@ -2,12 +2,17 @@ import { SchematicClient } from "@schematichq/schematic-typescript-node";
 
 const apiKey = process.env.SCHEMATIC_API_KEY;
 
-const noOpClient = {
+type SchematicFallbackClient = {
+  track: (...args: unknown[]) => Promise<void>;
+  checkFlag: (...args: unknown[]) => Promise<boolean>;
+};
+
+const noOpClient: SchematicFallbackClient = {
   track: async () => undefined,
   checkFlag: async () => false,
-} as any;
+};
 
-export const client = apiKey
+export const client: SchematicClient | SchematicFallbackClient = apiKey
   ? new SchematicClient({
       apiKey,
       cacheProviders: {
