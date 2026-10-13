@@ -187,6 +187,33 @@ export default function SocialPublishPanel() {
         }
     }
 
+    const [discoveringInstagram, setDiscoveringInstagram] = useState(false);
+
+    async function handleDiscoverInstagram() {
+        if (!instagramAccessToken.trim()) return;
+        setDiscoveringInstagram(true);
+        setError("");
+        try {
+            const res = await fetch("/api/auth/instagram/discover", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ accessToken: instagramAccessToken.trim() }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) throw new Error(data.error || "Erro ao detectar conta do Instagram.");
+            setCredsSuccessMsg(`✓ Conta @${data.account.username} vinculada com ID: ${data.account.igId}!`);
+            setInstagramAccountId(data.account.igId);
+            if (data.account.username) setInstagramHandle(`@${data.account.username}`);
+            const fresh = await fetch("/api/social-credentials").then((r) => r.json());
+            if (fresh.ok && fresh.credentials) setCredsStatus(fresh.credentials);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Falha na detecção do Instagram.";
+            setError(message);
+        } finally {
+            setDiscoveringInstagram(false);
+        }
+    }
+
     // Carrega status das credenciais cadastradas
     useEffect(() => {
         fetch("/api/social-credentials")
@@ -536,13 +563,24 @@ export default function SocialPublishPanel() {
                                     <label className="block text-[11px] text-slate-300 font-semibold mb-1">
                                         INSTAGRAM_ACCESS_TOKEN (Graph API)
                                     </label>
-                                    <input
-                                        type="password"
-                                        value={instagramAccessToken}
-                                        onChange={(e) => setInstagramAccessToken(e.target.value)}
-                                        placeholder={credsStatus.instagram?.hasToken ? "Token salvo (digite para substituir)" : "Cole seu Meta User/System Access Token"}
-                                        className="w-full rounded-xl border border-white/15 bg-black/60 px-3 py-2 text-xs text-white font-mono outline-none focus:border-pink-400"
-                                    />
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="password"
+                                            value={instagramAccessToken}
+                                            onChange={(e) => setInstagramAccessToken(e.target.value)}
+                                            placeholder={credsStatus.instagram?.hasToken ? "Token salvo (digite para substituir)" : "Cole seu Meta User/System Access Token"}
+                                            className="w-full rounded-xl border border-white/15 bg-black/60 px-3 py-2 text-xs text-white font-mono outline-none focus:border-pink-400"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleDiscoverInstagram}
+                                            disabled={discoveringInstagram || !instagramAccessToken}
+                                            className="px-3 py-2 rounded-xl bg-pink-600/30 hover:bg-pink-600/50 text-pink-300 text-[10px] font-heading uppercase font-bold transition disabled:opacity-50 cursor-pointer whitespace-nowrap border border-pink-500/30"
+                                            title="Detecta automaticamente o ID da sua conta profissional do Instagram"
+                                        >
+                                            {discoveringInstagram ? "Buscando..." : "Detectar ID"}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div>
