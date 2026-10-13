@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 
 import {
     selectBestClip,
+    createClip,
     buildFfmpegArgs,
     buildFfmpegCommand,
     buildSubtitle,
     buildAssSubtitle,
     formatAssTimestamp,
     toTimedWords,
+    VIRAL_EMOJI_MAP,
 } from './viral-short-pipeline.js';
 
 test('selectBestClip chooses the strongest segment under 60 seconds', () => {
@@ -102,7 +104,7 @@ test('buildAssSubtitle generates TikTok-style pop chunks with Deep Pink emphasis
     assert.ok(ass.includes('Style: ViralHormozi'));
     assert.ok(ass.includes('HookBanner,,0,0,0,,{\\fad(150,0)}GANCHO VIRAL'));
     assert.ok(ass.includes('\\t(0,90,\\fscx108\\fscy108)'));
-    assert.ok(ass.includes('&H009314FF&}AGORA!'));
+    assert.ok(ass.includes('&H009314FF&}⏱️ AGORA!'));
     // 5 palavras em blocos de 3 → 2 eventos no primeiro segmento
     const firstSegmentEvents = ass.split('\n').filter((l) => l.startsWith('Dialogue: 0,0:00:0') && /0:00:0[0-2]\./.test(l.split(',')[2]));
     assert.ok(firstSegmentEvents.length >= 2);
@@ -119,4 +121,51 @@ test('formatAssTimestamp formats accurately for ASS centiseconds', () => {
     assert.equal(formatAssTimestamp(0), '0:00:00.00');
     assert.equal(formatAssTimestamp(65.25), '0:01:05.25');
     assert.equal(formatAssTimestamp(3661.5), '1:01:01.50');
+});
+
+test('buildAssSubtitle injects viral emojis when autoEmojis is enabled', () => {
+    const segments = [
+        { start: 0, end: 4, text: 'O segredo para ganhar dinheiro agora muda tudo' },
+    ];
+    const ass = buildAssSubtitle(segments, { maxSeconds: 10, autoEmojis: true });
+    assert.ok(ass.includes(VIRAL_EMOJI_MAP.segredo));
+    assert.ok(ass.includes(VIRAL_EMOJI_MAP.dinheiro));
+    assert.ok(ass.includes(VIRAL_EMOJI_MAP.agora));
+    assert.ok(ass.includes(VIRAL_EMOJI_MAP.muda));
+
+    const assWithoutEmojis = buildAssSubtitle(segments, { maxSeconds: 10, autoEmojis: false });
+    assert.ok(!assWithoutEmojis.includes(VIRAL_EMOJI_MAP.segredo));
+    assert.ok(!assWithoutEmojis.includes(VIRAL_EMOJI_MAP.dinheiro));
+});
+
+test('createClip passes dynamicZoom, progressBar, autoEmojis and hookHeadline down to plan', () => {
+    const segments = [
+        { start: 0, end: 15, text: 'Aqui está a maior revelação sobre inteligência artificial agora.' },
+    ];
+
+    const planZoom = createClip({
+        inputPath: 'in.mp4',
+        outputPath: 'out.mp4',
+        transcriptSegments: segments,
+        dynamicZoom: true,
+        progressBar: true,
+        autoEmojis: true,
+        hookHeadline: 'SUPER GANCHO',
+    });
+
+    assert.ok(planZoom.ffmpegArgs.join(' ').includes('mod(t,9)'));
+    assert.ok(planZoom.ffmpegArgs.join(' ').includes('0xFF1493'));
+    assert.ok(planZoom.assSubtitle.includes('SUPER GANCHO'));
+    assert.ok(planZoom.assSubtitle.includes(VIRAL_EMOJI_MAP.agora));
+
+    const planStatic = createClip({
+        inputPath: 'in.mp4',
+        outputPath: 'out.mp4',
+        transcriptSegments: segments,
+        dynamicZoom: false,
+        progressBar: false,
+    });
+
+    assert.ok(!planStatic.ffmpegArgs.join(' ').includes('mod(t,9)'));
+    assert.ok(!planStatic.ffmpegArgs.join(' ').includes('0xFF1493'));
 });

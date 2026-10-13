@@ -42,6 +42,9 @@ export async function POST(request: Request) {
         const hookHeadline = String(formData.get("hookHeadline") || "").trim();
         const normalizeAudio = formData.get("normalizeAudio") === "true";
         const burnSubtitles = formData.get("burnSubtitles") !== "false";
+        const dynamicZoom = formData.get("dynamicZoom") !== "false";
+        const autoEmojis = formData.get("autoEmojis") !== "false";
+        const progressBar = formData.get("progressBar") !== "false";
         const assFileName = `${baseName}-short.mp4.ass`;
         const assSubtitlePath = path.join(uploadDir, assFileName);
 
@@ -58,6 +61,9 @@ export async function POST(request: Request) {
             hookHeadline: hookHeadline || null,
             subtitlePath: burnSubtitles ? assFileName : null,
             normalizeAudio,
+            dynamicZoom,
+            autoEmojis,
+            progressBar,
         });
 
         // Legendas precisam existir ANTES da renderização para serem queimadas no vídeo

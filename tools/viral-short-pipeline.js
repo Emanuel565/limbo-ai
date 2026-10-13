@@ -179,6 +179,7 @@ function sanitizeDrawtext(text) {
  * @param {string|null} [params.hookHeadline] Usado via drawtext somente quando não há .ass (o .ass já desenha a tarja)
  * @param {boolean} [params.normalizeAudio]
  * @param {boolean} [params.progressBar]
+ * @param {boolean} [params.dynamicZoom] Alterna enquadramento entre normal e punch-in (1.15x) a cada 4.5s
  */
 export function buildFfmpegArgs({
     inputPath,
@@ -190,15 +191,24 @@ export function buildFfmpegArgs({
     hookHeadline = null,
     normalizeAudio = false,
     progressBar = true,
+    dynamicZoom = true,
 }) {
     const safeDuration = Math.max(1, Number(duration) || 1);
 
     const filters = [
         'scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos',
-        'crop=1080:1920:(iw-1080)/2:(ih-1920)/2',
-        'setsar=1',
-        'fps=30',
     ];
+
+    if (dynamicZoom) {
+        // Pattern Interrupt: alternância rítmica a cada 4.5s entre plano geral (1.0x) e punch-in de foco (1.15x)
+        filters.push("crop='w=if(between(mod(t,9),4.5,9),1080*0.87,1080):h=if(between(mod(t,9),4.5,9),1920*0.87,1920):x=(iw-ow)/2:y=(ih-oh)/2'");
+        filters.push('scale=1080:1920:flags=lanczos');
+    } else {
+        filters.push('crop=1080:1920:(iw-1080)/2:(ih-1920)/2');
+    }
+
+    filters.push('setsar=1');
+    filters.push('fps=30');
 
     if (hookHeadline && !subtitlePath) {
         filters.push('drawbox=y=140:color=black@0.65:width=iw:height=130:t=fill');
@@ -265,6 +275,29 @@ const EMPHASIS_WORDS = new Set([
     'ninguém', 'todos', 'milhões', 'mil', 'rápido', 'simples', 'importante', 'cuidado', 'tudo', 'muda',
 ]);
 
+export const VIRAL_EMOJI_MAP = {
+    dinheiro: '💰',
+    grátis: '🎁',
+    lucro: '💰',
+    segredo: '🤫',
+    secreto: '🤫',
+    revelação: '🤫',
+    agora: '⏱️',
+    rápido: '⚡',
+    erro: '❌',
+    pare: '🛑',
+    nunca: '🛑',
+    cuidado: '⚠️',
+    atenção: '⚠️',
+    alerta: '⚠️',
+    verdade: '💡',
+    importante: '💎',
+    tudo: '🔥',
+    muda: '🚀',
+    milhões: '📈',
+    mil: '💸',
+};
+
 function isEmphasisWord(word) {
     const clean = word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
     return EMPHASIS_WORDS.has(clean) || /[!?]/.test(word) || /\d/.test(word) || clean.length >= 9;
@@ -307,6 +340,7 @@ export function buildAssSubtitle(segments, {
     clipStart = 0,
     hookHeadline = null,
     wordsPerChunk = 3,
+    autoEmojis = true,
 } = {}) {
     const normalized = segments
         .map((segment, index) => normalizeSegment(segment, index))
@@ -353,7 +387,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             const text = chunk
                 .map(({ word }) => {
                     const safe = escapeAssText(word).toUpperCase();
-                    return isEmphasisWord(word) ? `{\\c&H009314FF&}${safe}{\\c&H00FFFFFF&}` : safe;
+                    const clean = word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+                    const emoji = autoEmojis && VIRAL_EMOJI_MAP[clean] ? `${VIRAL_EMOJI_MAP[clean]} ` : '';
+                    return isEmphasisWord(word) ? `{\\c&H009314FF&}${emoji}${safe}{\\c&H00FFFFFF&}` : safe;
                 })
                 .join(' ');
 
@@ -451,6 +487,9 @@ ${transcript}`,
  * @param {string|null} [params.hookHeadline]
  * @param {boolean} [params.normalizeAudio]
  * @param {boolean} [params.useNvenc]
+ * @param {boolean} [params.progressBar]
+ * @param {boolean} [params.dynamicZoom]
+ * @param {boolean} [params.autoEmojis]
  */
 export function createClip({
     inputPath,
@@ -461,6 +500,9 @@ export function createClip({
     hookHeadline = null,
     normalizeAudio = false,
     useNvenc = true,
+    progressBar = true,
+    dynamicZoom = true,
+    autoEmojis = true,
 }) {
     const plan = selectBestClip(transcriptSegments, maxSeconds);
     const resolvedHookHeadline = hookHeadline || plan.title;
@@ -474,6 +516,8 @@ export function createClip({
         hookHeadline: resolvedHookHeadline,
         normalizeAudio,
         useNvenc,
+        progressBar,
+        dynamicZoom,
     };
 
     // Legendas na linha do tempo do CORTE (o trecho começa em plan.start no vídeo original)
@@ -483,6 +527,7 @@ export function createClip({
         clipStart: plan.start,
         hookTitle: plan.title,
         hookHeadline: resolvedHookHeadline,
+        autoEmojis,
     });
 
     return {

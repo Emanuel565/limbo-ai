@@ -29,6 +29,9 @@ export default function ShortsPipelinePanel() {
     const [hookHeadline, setHookHeadline] = useState("O SEGREDO QUE NINGUÉM CONTA");
     const [normalizeAudio, setNormalizeAudio] = useState(true);
     const [assSubtitles, setAssSubtitles] = useState(true);
+    const [dynamicZoom, setDynamicZoom] = useState(true);
+    const [autoEmojis, setAutoEmojis] = useState(true);
+    const [progressBar, setProgressBar] = useState(true);
     const [plan, setPlan] = useState<ShortPlan | null>(null);
     const [testResult, setTestResult] = useState<TestResult | null>(null);
     const [loading, setLoading] = useState(false);
@@ -136,6 +139,9 @@ export default function ShortsPipelinePanel() {
             formData.append("hookHeadline", hookHeadline);
             formData.append("normalizeAudio", String(normalizeAudio));
             formData.append("burnSubtitles", String(assSubtitles));
+            formData.append("dynamicZoom", String(dynamicZoom));
+            formData.append("autoEmojis", String(autoEmojis));
+            formData.append("progressBar", String(progressBar));
 
             const response = await fetch("/api/shorts-upload", {
                 method: "POST",
@@ -242,8 +248,8 @@ export default function ShortsPipelinePanel() {
                             />
                         </div>
 
-                        {/* Audio & Subtitle Options Toggles */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+                        {/* Audio & Video Pipeline Options Toggles */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-5">
                             <label className="flex items-center gap-2 p-3 rounded-2xl bg-black/40 border border-white/10 cursor-pointer hover:border-[#FF1493]/40 transition">
                                 <input
                                     type="checkbox"
@@ -252,7 +258,7 @@ export default function ShortsPipelinePanel() {
                                     className="accent-[#FF1493] w-4 h-4 rounded"
                                 />
                                 <span className="text-xs text-slate-200 font-medium">
-                                    🔊 Normalizar Áudio (loudnorm -14 LUFS)
+                                    🔊 Áudio (-14 LUFS)
                                 </span>
                             </label>
 
@@ -264,7 +270,43 @@ export default function ShortsPipelinePanel() {
                                     className="accent-[#FF1493] w-4 h-4 rounded"
                                 />
                                 <span className="text-xs text-slate-200 font-medium">
-                                    ✨ Legendas ASS (Destaque Rosa #FF1493)
+                                    ✨ Legendas Pop ASS
+                                </span>
+                            </label>
+
+                            <label className="flex items-center gap-2 p-3 rounded-2xl bg-black/40 border border-white/10 cursor-pointer hover:border-[#FF1493]/40 transition">
+                                <input
+                                    type="checkbox"
+                                    checked={dynamicZoom}
+                                    onChange={(e) => setDynamicZoom(e.target.checked)}
+                                    className="accent-[#FF1493] w-4 h-4 rounded"
+                                />
+                                <span className="text-xs text-slate-200 font-medium">
+                                    🎥 Punch-in Zoom (1.15x)
+                                </span>
+                            </label>
+
+                            <label className="flex items-center gap-2 p-3 rounded-2xl bg-black/40 border border-white/10 cursor-pointer hover:border-[#FF1493]/40 transition">
+                                <input
+                                    type="checkbox"
+                                    checked={autoEmojis}
+                                    onChange={(e) => setAutoEmojis(e.target.checked)}
+                                    className="accent-[#FF1493] w-4 h-4 rounded"
+                                />
+                                <span className="text-xs text-slate-200 font-medium">
+                                    🔥 Emojis Virais
+                                </span>
+                            </label>
+
+                            <label className="flex items-center gap-2 p-3 rounded-2xl bg-black/40 border border-white/10 cursor-pointer hover:border-[#FF1493]/40 transition sm:col-span-2 md:col-span-1">
+                                <input
+                                    type="checkbox"
+                                    checked={progressBar}
+                                    onChange={(e) => setProgressBar(e.target.checked)}
+                                    className="accent-[#FF1493] w-4 h-4 rounded"
+                                />
+                                <span className="text-xs text-slate-200 font-medium">
+                                    📊 Barra de Retenção
                                 </span>
                             </label>
                         </div>
@@ -367,18 +409,29 @@ export default function ShortsPipelinePanel() {
 
                                         {/* Bottom Karaoke Subtitle Simulation */}
                                         {assSubtitles && (
-                                            <div className="mb-2 text-center bg-black/60 rounded px-1 py-1">
+                                            <div className="mb-2 text-center bg-black/70 rounded px-1.5 py-1 border border-white/5">
                                                 <span className="text-[9px] text-white font-bold uppercase tracking-tight">
-                                                    ISSO <span className="text-[#FF1493] font-black underline">MUDA TUDO</span> AGORA
+                                                    {autoEmojis ? "🔥 ISSO " : "ISSO "}
+                                                    <span className="text-[#FF1493] font-black underline">
+                                                        {autoEmojis ? "🚀 MUDA TUDO" : "MUDA TUDO"}
+                                                    </span>
+                                                    {autoEmojis ? " ⏱️ AGORA" : " AGORA"}
                                                 </span>
                                             </div>
                                         )}
 
-                                        <div className="text-center bg-[#FF1493]/20 rounded-lg p-1.5 border border-[#FF1493]/30">
+                                        <div className="text-center bg-[#FF1493]/20 rounded-lg p-1.5 border border-[#FF1493]/30 mb-2">
                                             <span className="text-[8px] text-[#FF1493] font-bold block uppercase tracking-wider">
-                                                NVENC • LOUDNORM -14 LUFS
+                                                NVENC • {dynamicZoom ? "PUNCH-IN ZOOM • " : ""}{normalizeAudio ? "-14 LUFS" : "ÁUDIO PADRÃO"}
                                             </span>
                                         </div>
+
+                                        {/* Retention Progress Bar Simulation */}
+                                        {progressBar && (
+                                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+                                                <div className="h-full w-3/4 bg-[#FF1493] rounded-r shadow-[0_0_8px_#FF1493]" />
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="rounded-2xl border border-[#e8d9c6]/20 bg-black/40 p-4">
