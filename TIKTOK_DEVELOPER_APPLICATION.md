@@ -30,15 +30,21 @@ Ferramenta inteligente de edição 9:16 e publicação de vídeos curtos para cr
 
 ---
 
-### 4. URLs Obrigatórias (Termos, Política e Site)
+### 4. URLs Obrigatórias (Termos, Política e Site no GitHub Pages)
 
-| Campo no TikTok | URL Oficial do Projeto |
+| Campo no Formulário do TikTok | URL Válida Oficial (HTTPS) |
 |---|---|
-| **Website / Desktop URL** | `https://github.com/Emanuel565/limbo-ai` |
-| **Terms of Service URL** | `https://github.com/Emanuel565/limbo-ai/blob/dev/app/terms/page.tsx` *(ou `https://seu-dominio.vercel.app/terms`)* |
-| **Privacy Policy URL** | `https://github.com/Emanuel565/limbo-ai/blob/dev/app/privacy/page.tsx` *(ou `https://seu-dominio.vercel.app/privacy`)* |
+| **Website / Desktop URL \*** | `https://emanuel565.github.io/limbo-ai/` |
+| **Terms of Service URL \*** | `https://emanuel565.github.io/limbo-ai/terms.html` |
+| **Privacy Policy URL \*** | `https://emanuel565.github.io/limbo-ai/privacy.html` |
 
-> 💡 **Nota:** As páginas de Termos e Privacidade já foram criadas dentro do código da aplicação em [`/terms`](file:///c:/Users/manuc/agentube-ai-agent/app/terms/page.tsx) e [`/privacy`](file:///c:/Users/manuc/agentube-ai-agent/app/privacy/page.tsx). Caso você faça deploy na Vercel ou similar, pode colar a URL do seu domínio diretamente.
+> 🌐 **Links hospedados no GitHub Pages:** As páginas estáticas oficiais foram criadas na pasta `/docs` do repositório `Emanuel565/limbo-ai` e são servidas automaticamente pelo GitHub Pages com certificado SSL HTTPS válido.
+> 
+> **Para ativar no GitHub (em 1 clique):**
+> 1. No repositório [github.com/Emanuel565/limbo-ai](https://github.com/Emanuel565/limbo-ai), vá em **Settings** > **Pages**
+> 2. Em **Build and deployment > Source**, escolha **Deploy from a branch**
+> 3. Em **Branch**, selecione `dev` (ou `main`) e a pasta `/docs` e clique em **Save**. Pronto!
+
 
 ---
 

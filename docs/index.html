@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limbo AI Studio — Automação de Vídeos Verticais</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #14010e;
+            --bg-card: rgba(26, 4, 20, 0.7);
+            --pink-neon: #FF1493;
+            --pink-glow: rgba(255, 20, 147, 0.35);
+            --text-main: #f8fafc;
+            --text-muted: #cbd5e1;
+            --border-card: rgba(255, 20, 147, 0.25);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 15% 20%, rgba(255, 20, 147, 0.12) 0%, transparent 45%),
+                radial-gradient(circle at 85% 80%, rgba(147, 20, 255, 0.1) 0%, transparent 45%);
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 24px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(20, 1, 14, 0.85);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .nav-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 900;
+            font-size: 1.3rem;
+            text-transform: uppercase;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff;
+            text-decoration: none;
+        }
+
+        .logo span {
+            color: var(--pink-neon);
+            text-shadow: 0 0 16px var(--pink-glow);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--pink-neon);
+        }
+
+        .btn-github {
+            background: rgba(255, 20, 147, 0.15);
+            border: 1px solid var(--pink-neon);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .btn-github:hover {
+            background: var(--pink-neon);
+            box-shadow: 0 0 20px var(--pink-glow);
+            color: #fff;
+        }
+
+        main {
+            flex: 1;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 16px;
+            border-radius: 999px;
+            background: rgba(255, 20, 147, 0.1);
+            border: 1px solid var(--border-card);
+            color: var(--pink-neon);
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 2.8rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+            line-height: 1.15;
+            margin-bottom: 20px;
+        }
+
+        h1 mark {
+            background: none;
+            color: var(--pink-neon);
+            text-shadow: 0 0 24px var(--pink-glow);
+        }
+
+        p.hero-desc {
+            font-size: 1.05rem;
+            color: var(--text-muted);
+            max-width: 680px;
+            margin: 0 auto 40px;
+            font-weight: 300;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            text-align: left;
+            margin-top: 50px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 24px;
+            padding: 28px;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s, border-color 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--pink-neon);
+        }
+
+        .feature-card h3 {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+        .feature-card p {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            line-height: 1.55;
+            font-weight: 300;
+        }
+
+        footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 30px 20px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            background: rgba(15, 1, 10, 0.9);
+        }
+
+        footer a {
+            color: var(--pink-neon);
+            text-decoration: none;
+            margin: 0 10px;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2rem; }
+            .nav-links { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="nav-container">
+            <a href="index.html" class="logo">
+                Limbo <span>AI Studio</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html">Início</a>
+                <a href="privacy.html">Privacidade</a>
+                <a href="terms.html">Termos de Serviço</a>
+                <a href="https://github.com/Emanuel565/limbo-ai" class="btn-github" target="_blank" rel="noreferrer">GitHub</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="badge">Automação de Conteúdo Vertical • TikTok Content API v2</div>
+        <h1>Edição Inteligente & <mark>Publicação no TikTok</mark></h1>
+        <p class="hero-desc">
+            Plataforma desenvolvida por <strong>Emanuel565</strong> para renderização de vídeos 9:16 com aceleração por hardware (GPU NVENC), legendas animadas dinâmicas e integração oficial via TikTok Content Posting API.
+        </p>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <h3>🎥 Reenquadramento 9:16 & Punch-in</h3>
+                <p>Corte vertical automatizado (1080x1920) com alternância dinâmica de enquadramento (1.15x close-up a cada 4.5s) e barra de retenção visual no rodapé para maximizar o tempo de exibição.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🔥 Legendas Pop & Emojis Virais</h3>
+                <p>Geração de legendas no formato SubStation Alpha (.ass) estilo Alex Hormozi, com palavras de destaque em rosa choque (#FF1493) e inserção contextual de emojis virais.</p>
+            </div>
+            <div class="feature-card">
+                <h3>🚀 TikTok Content Posting API v2</h3>
+                <p>Postagem oficial e direta para o TikTok via OAuth 2.0 (Login Kit), com suporte a controle de privacidade, comentários, duetos e hashtags otimizadas para o algoritmo #fyp.</p>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>© 2026 <strong>Limbo AI</strong> • Desenvolvido exclusivamente por <strong>Emanuel565</strong>.</p>
+        <p style="margin-top: 8px;">
+            <a href="privacy.html">Política de Privacidade</a> | 
+            <a href="terms.html">Termos de Serviço</a> | 
+            <a href="https://github.com/Emanuel565/limbo-ai" target="_blank" rel="noreferrer">Repositório GitHub</a>
+        </p>
+    </footer>
+</body>
+</html>
