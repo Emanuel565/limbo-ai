@@ -55,5 +55,18 @@ test('selectViralVideoWithOllama provides fallback when Ollama is unreachable', 
     assert.equal(result.videoId, 'video123');
     assert.ok(result.hookAnalysis.length > 0);
     assert.ok(result.whyViral.length > 0);
+    assert.ok(result.curiosityGapScore > 0);
+    assert.ok(result.patternInterruptScore > 0);
+    assert.ok(result.viralHookFormula.length > 0);
+    assert.ok(result.suggestedHeadline.length > 0);
     assert.equal(result.modelUsed, 'heuristic-fallback');
 });
+
+test('fetchTopTrendingGlobal throws without API key', async () => {
+    const { fetchTopTrendingGlobal } = await import('./trend-hunter.js');
+    await assert.rejects(
+        () => fetchTopTrendingGlobal({ apiKey: '' }),
+        /YOUTUBE_API_KEY/
+    );
+});
+

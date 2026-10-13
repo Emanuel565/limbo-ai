@@ -26,25 +26,33 @@ Quando a mensagem está clara, a retenção sobe e a audiência entende a propos
 export default function ShortsPipelinePanel() {
     const [transcript, setTranscript] = useState(sampleTranscript);
     const [videoUrl, setVideoUrl] = useState("");
+    const [hookHeadline, setHookHeadline] = useState("O SEGREDO QUE NINGUÉM CONTA");
+    const [normalizeAudio, setNormalizeAudio] = useState(true);
+    const [assSubtitles, setAssSubtitles] = useState(true);
     const [plan, setPlan] = useState<ShortPlan | null>(null);
     const [testResult, setTestResult] = useState<TestResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [testing, setTesting] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [videoFile, setVideoFile] = useState<File | null>(null);
-    const [generated, setGenerated] = useState<{ mp4Url?: string; subtitleUrl?: string } | null>(null);
+    const [generated, setGenerated] = useState<{ mp4Url?: string; subtitleUrl?: string; assSubtitleUrl?: string } | null>(null);
     const [error, setError] = useState("");
 
     // Ouve eventos disparados pelo Trend Hunter
     useEffect(() => {
         function handleVideoSelected(e: Event) {
-            const customEvent = e as CustomEvent<{ url?: string }>;
+            const customEvent = e as CustomEvent<{ url?: string; headline?: string; hook?: string }>;
             if (customEvent.detail?.url) {
                 setVideoUrl(customEvent.detail.url);
                 setError("");
             }
+            if (customEvent.detail?.headline) {
+                setHookHeadline(customEvent.detail.headline);
+            }
+            if (customEvent.detail?.hook) {
+                setTranscript((prev) => `${customEvent.detail.hook}\n\n${prev}`);
+            }
         }
-
 
         window.addEventListener("select-short-video", handleVideoSelected);
         return () => window.removeEventListener("select-short-video", handleVideoSelected);
@@ -125,6 +133,8 @@ export default function ShortsPipelinePanel() {
             const formData = new FormData();
             formData.append("video", videoFile);
             formData.append("transcript", transcript);
+            formData.append("hookHeadline", hookHeadline);
+            formData.append("normalizeAudio", String(normalizeAudio));
 
             const response = await fetch("/api/shorts-upload", {
                 method: "POST",
@@ -140,6 +150,7 @@ export default function ShortsPipelinePanel() {
             setGenerated({
                 mp4Url: data.mp4Url,
                 subtitleUrl: data.subtitleUrl,
+                assSubtitleUrl: data.assSubtitleUrl,
             });
             setPlan(data.plan);
             setError("");
@@ -152,13 +163,14 @@ export default function ShortsPipelinePanel() {
     }
 
     return (
-        <section id="shorts" className="py-24 px-4 relative overflow-hidden bg-[#070a10]">
+        <section id="shorts" className="py-24 px-4 relative overflow-hidden bg-[#14010e]">
             <div className="container mx-auto max-w-6xl relative z-10">
+
                 {/* Header Section */}
                 <div className="text-center mb-12">
                     <div className="inline-flex items-center gap-2 mb-4">
                         <span className="belve-badge flex items-center gap-1.5">
-                            <Scissors className="w-3.5 h-3.5 text-[#e8d9c6]" />
+                            <Scissors className="w-3.5 h-3.5 text-[#FF1493]" />
                             Editor Vertical 9:16 • GPU NVENC
                         </span>
                     </div>
@@ -168,12 +180,12 @@ export default function ShortsPipelinePanel() {
                     </h2>
 
                     <p className="max-w-2xl mx-auto text-sm md:text-base text-slate-300 font-light leading-relaxed">
-                        Corte de alta precisão com reenquadramento automático 9:16 (1080x1920) e aceleração
-                        por hardware na sua placa de vídeo RTX 3060 Ti via FFmpeg NVENC.
+                        Corte de alta precisão com reenquadramento automático 9:16 (1080x1920), tarja de gancho visual,
+                        áudio normalizado EBU R128 (-14 LUFS) e aceleração na sua RTX 3060 Ti via FFmpeg NVENC.
                     </p>
 
                     {/* GPU Badge */}
-                    <div className="inline-flex items-center gap-2 mt-4 px-4 py-1.5 rounded-full bg-black/60 border border-[#e8d9c6]/30 text-xs font-heading uppercase tracking-wider text-[#e8d9c6]">
+                    <div className="inline-flex items-center gap-2 mt-4 px-4 py-1.5 rounded-full bg-black/60 border border-[#FF1493]/30 text-xs font-heading uppercase tracking-wider text-[#FF1493]">
                         <Cpu className="w-3.5 h-3.5 text-emerald-400" />
                         <span>Aceleração por Hardware: <strong>h264_nvenc (RTX 3060 Ti)</strong></span>
                     </div>
@@ -183,9 +195,9 @@ export default function ShortsPipelinePanel() {
                     {/* Input Controls Card */}
                     <div className="belve-card rounded-3xl p-6 md:p-8">
                         {videoUrl && (
-                            <div className="mb-5 p-3 rounded-2xl bg-[#e8d9c6]/10 border border-[#e8d9c6]/30 flex items-center justify-between">
+                            <div className="mb-5 p-3 rounded-2xl bg-[#FF1493]/10 border border-[#FF1493]/30 flex items-center justify-between">
                                 <div className="text-xs">
-                                    <span className="text-[10px] font-heading uppercase tracking-wider text-[#e8d9c6] block font-semibold">
+                                    <span className="text-[10px] font-heading uppercase tracking-wider text-[#FF1493] block font-semibold">
                                         Vídeo Alvo Selecionado do Trend Hunter:
                                     </span>
                                     <span className="text-white truncate block max-w-md font-mono">{videoUrl}</span>
@@ -199,6 +211,23 @@ export default function ShortsPipelinePanel() {
                             </div>
                         )}
 
+                        {/* Viral Hook Headline Input */}
+                        <div className="mb-5">
+                            <label className="mb-2 block text-xs font-heading font-semibold uppercase tracking-wider text-[#FF1493]">
+                                🏷️ Tarja Superior de Gancho (Headline Fixa no Topo)
+                            </label>
+                            <input
+                                type="text"
+                                value={hookHeadline}
+                                onChange={(event) => setHookHeadline(event.target.value)}
+                                className="w-full rounded-2xl border border-white/15 bg-black/40 px-4 py-2.5 text-xs text-white outline-none transition focus:border-[#FF1493] font-heading font-bold uppercase tracking-wider"
+                                placeholder="Ex: O SEGREDO QUE NINGUÉM TE CONTA"
+                            />
+                            <p className="mt-1 text-[11px] text-slate-400">
+                                Desenhada automaticamente no topo do vídeo 9:16 via drawbox + drawtext para reter a atenção nos primeiros segundos.
+                            </p>
+                        </div>
+
                         <div className="mb-5">
                             <label className="mb-2 block text-xs font-heading font-semibold uppercase tracking-wider text-[#e8d9c6]">
                                 Transcrição do Conteúdo (ou Roteiro)
@@ -206,10 +235,37 @@ export default function ShortsPipelinePanel() {
                             <textarea
                                 value={transcript}
                                 onChange={(event) => setTranscript(event.target.value)}
-                                rows={6}
-                                className="w-full rounded-2xl border border-[#e8d9c6]/20 bg-black/40 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-[#e8d9c6] font-sans leading-relaxed"
+                                rows={5}
+                                className="w-full rounded-2xl border border-[#e8d9c6]/20 bg-black/40 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-[#FF1493] font-sans leading-relaxed"
                                 placeholder="Cole a transcrição do vídeo para o Ollama encontrar o trecho mais forte..."
                             />
+                        </div>
+
+                        {/* Audio & Subtitle Options Toggles */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+                            <label className="flex items-center gap-2 p-3 rounded-2xl bg-black/40 border border-white/10 cursor-pointer hover:border-[#FF1493]/40 transition">
+                                <input
+                                    type="checkbox"
+                                    checked={normalizeAudio}
+                                    onChange={(e) => setNormalizeAudio(e.target.checked)}
+                                    className="accent-[#FF1493] w-4 h-4 rounded"
+                                />
+                                <span className="text-xs text-slate-200 font-medium">
+                                    🔊 Normalizar Áudio (loudnorm -14 LUFS)
+                                </span>
+                            </label>
+
+                            <label className="flex items-center gap-2 p-3 rounded-2xl bg-black/40 border border-white/10 cursor-pointer hover:border-[#FF1493]/40 transition">
+                                <input
+                                    type="checkbox"
+                                    checked={assSubtitles}
+                                    onChange={(e) => setAssSubtitles(e.target.checked)}
+                                    className="accent-[#FF1493] w-4 h-4 rounded"
+                                />
+                                <span className="text-xs text-slate-200 font-medium">
+                                    ✨ Legendas ASS (Destaque Rosa #FF1493)
+                                </span>
+                            </label>
                         </div>
 
                         <div className="mb-6 rounded-2xl border border-white/10 bg-black/40 p-4">
@@ -220,7 +276,7 @@ export default function ShortsPipelinePanel() {
                                 type="file"
                                 accept="video/*"
                                 onChange={(event) => setVideoFile(event.target.files?.[0] || null)}
-                                className="block w-full text-xs text-slate-300 file:mr-4 file:rounded-full file:border-0 file:bg-[#e8d9c6] file:px-4 file:py-2 file:text-xs file:font-heading file:font-bold file:uppercase file:tracking-wider file:text-black hover:file:bg-[#f4ece1] file:cursor-pointer"
+                                className="block w-full text-xs text-slate-300 file:mr-4 file:rounded-full file:border-0 file:bg-[#FF1493] file:px-4 file:py-2 file:text-xs file:font-heading file:font-bold file:uppercase file:tracking-wider file:text-white hover:file:bg-[#FF1493]/80 file:cursor-pointer"
                             />
                             {videoFile && (
                                 <p className="mt-2 text-xs text-emerald-400 font-mono">
@@ -255,7 +311,7 @@ export default function ShortsPipelinePanel() {
                                 type="button"
                                 onClick={uploadVideo}
                                 disabled={uploading || !videoFile}
-                                className="rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-heading uppercase tracking-wider text-xs px-6 py-3 font-bold transition flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="rounded-full bg-[#FF1493] hover:bg-[#FF1493]/90 text-white font-heading uppercase tracking-wider text-xs px-6 py-3 font-bold transition flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#FF1493]/40"
                             >
                                 <Play className="h-4 w-4" />
                                 {uploading ? "Renderizando na GPU..." : "Renderizar 9:16 (NVENC)"}
@@ -281,13 +337,24 @@ export default function ShortsPipelinePanel() {
 
                             {preview ? (
                                 <div className="space-y-4">
-                                    {/* Smartphone Frame Style Preview */}
-                                    <div className="mx-auto w-48 rounded-3xl border-2 border-[#e8d9c6]/40 bg-black/80 p-3 shadow-2xl relative aspect-[9/16] flex flex-col justify-between overflow-hidden">
-                                        <div className="flex justify-between items-center text-[9px] text-[#e8d9c6] font-mono">
-                                            <span>SHORTS</span>
+                                    {/* Smartphone Frame Style Preview with Headline & Subtitle */}
+                                    <div className="mx-auto w-52 rounded-3xl border-2 border-[#FF1493]/40 bg-black/90 p-3 shadow-2xl relative aspect-[9/16] flex flex-col justify-between overflow-hidden">
+                                        {/* Status Header */}
+                                        <div className="flex justify-between items-center text-[9px] text-[#e8d9c6] font-mono mb-1">
+                                            <span>SHORTS/TIKTOK</span>
                                             <span>{preview.duration}s</span>
                                         </div>
 
+                                        {/* Top Hook Headline Overlay */}
+                                        {hookHeadline && (
+                                            <div className="w-full bg-black/80 border border-[#FF1493]/40 rounded-lg py-1.5 px-1 text-center shadow-md">
+                                                <span className="text-[9px] font-heading font-black text-white uppercase tracking-tight block truncate">
+                                                    {hookHeadline}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Center Content */}
                                         <div className="my-auto text-center px-1">
                                             <p className="text-[10px] font-heading font-bold text-white line-clamp-3 mb-1 uppercase tracking-tight">
                                                 {preview.title}
@@ -297,9 +364,18 @@ export default function ShortsPipelinePanel() {
                                             </span>
                                         </div>
 
-                                        <div className="text-center bg-[#e8d9c6]/20 rounded-lg p-1.5 border border-[#e8d9c6]/30">
-                                            <span className="text-[8px] text-[#e8d9c6] font-bold block uppercase tracking-wider">
-                                                NVENC • 60 FPS
+                                        {/* Bottom Karaoke Subtitle Simulation */}
+                                        {assSubtitles && (
+                                            <div className="mb-2 text-center bg-black/60 rounded px-1 py-1">
+                                                <span className="text-[9px] text-white font-bold uppercase tracking-tight">
+                                                    ISSO <span className="text-[#FF1493] font-black underline">MUDA TUDO</span> AGORA
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        <div className="text-center bg-[#FF1493]/20 rounded-lg p-1.5 border border-[#FF1493]/30">
+                                            <span className="text-[8px] text-[#FF1493] font-bold block uppercase tracking-wider">
+                                                NVENC • LOUDNORM -14 LUFS
                                             </span>
                                         </div>
                                     </div>
@@ -315,13 +391,12 @@ export default function ShortsPipelinePanel() {
                                 </div>
                             ) : (
                                 <div className="rounded-2xl border border-dashed border-[#e8d9c6]/20 bg-black/30 p-8 text-center my-6">
-                                    <Film className="w-8 h-8 text-[#e8d9c6]/50 mx-auto mb-2" />
+                                    <Film className="w-8 h-8 text-[#FF1493]/50 mx-auto mb-2" />
                                     <p className="text-xs text-slate-300">
-                                        Clique em <strong>&ldquo;Identificar Gancho Viral&rdquo;</strong> para visualizar os timestamps
-                                        e o reenquadramento recomendado pela IA.
+                                        Clique em <strong>&ldquo;Identificar Gancho Viral&rdquo;</strong> para visualizar os timestamps,
+                                        tarja superior e o reenquadramento recomendado pela IA.
                                     </p>
                                 </div>
-
                             )}
 
                             {generated && (
@@ -340,13 +415,22 @@ export default function ShortsPipelinePanel() {
                                                 📥 Baixar Vídeo Vertical (.mp4)
                                             </a>
                                         )}
+                                        {generated.assSubtitleUrl && (
+                                            <a
+                                                href={generated.assSubtitleUrl}
+                                                download
+                                                className="block p-2 rounded-xl bg-[#FF1493]/20 hover:bg-[#FF1493]/30 text-pink-200 font-semibold transition"
+                                            >
+                                                ✨ Baixar Legenda Estilizada (.ass - Realce Rosa #FF1493)
+                                            </a>
+                                        )}
                                         {generated.subtitleUrl && (
                                             <a
                                                 href={generated.subtitleUrl}
                                                 download
                                                 className="block p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 transition"
                                             >
-                                                📄 Baixar Legenda Sincronizada (.srt)
+                                                📄 Baixar Legenda Padrão (.srt)
                                             </a>
                                         )}
                                     </div>

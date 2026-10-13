@@ -10,15 +10,15 @@ function Header() {
       <div className="max-w-6xl mx-auto belve-pill-nav rounded-full px-5 py-3 flex items-center justify-between transition-all duration-300">
         {/* Brand & Status */}
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="relative flex items-center justify-center w-9 h-9 rounded-full bg-[#e8d9c6]/10 border border-[#e8d9c6]/30 group-hover:border-[#e8d9c6] transition-colors">
+          <div className="relative flex items-center justify-center w-9 h-9 rounded-full bg-[#FF1493]/15 border border-[#FF1493]/40 group-hover:border-[#FF1493] transition-colors">
             <AgentPulse size="small" color="blue" />
           </div>
           <div className="flex flex-col">
-            <span className="font-heading text-lg font-bold tracking-[0.14em] text-white uppercase group-hover:text-[#e8d9c6] transition-colors">
-              Limbo<span className="text-[#e8d9c6]">.</span>AI
+            <span className="font-heading text-lg font-bold tracking-[0.14em] text-white uppercase group-hover:text-[#FF1493] transition-colors">
+              Limbo<span className="text-[#FF1493]">.</span>AI
             </span>
-            <span className="text-[10px] tracking-[0.2em] uppercase font-semibold text-[#a8bed5]/80">
-              Estética & Inteligência
+            <span className="text-[10px] tracking-[0.2em] uppercase font-semibold text-[#ff80bf]">
+              Viral Studio • #FF1493
             </span>
           </div>
         </Link>
@@ -27,40 +27,40 @@ function Header() {
         <nav className="hidden md:flex items-center gap-1.5 text-xs">
           <Link
             href="/"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full font-heading font-semibold uppercase tracking-[0.12em] text-[#e8d9c6]/90 hover:text-white hover:bg-white/5 transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full font-heading font-semibold uppercase tracking-[0.12em] text-[#ff80bf] hover:text-white hover:bg-[#FF1493]/10 transition-all"
           >
             Início
           </Link>
 
           <Link
             href="/#trend-hunter"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full font-heading font-semibold uppercase tracking-[0.12em] text-[#a8bed5] hover:text-white hover:bg-white/5 transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full font-heading font-semibold uppercase tracking-[0.12em] text-slate-300 hover:text-[#FF1493] hover:bg-[#FF1493]/10 transition-all"
           >
-            <TrendingUp className="w-3.5 h-3.5 text-[#e8d9c6]" />
+            <TrendingUp className="w-3.5 h-3.5 text-[#FF1493]" />
             Trend Hunter
           </Link>
 
           <Link
             href="/#shorts"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full font-heading font-semibold uppercase tracking-[0.12em] text-slate-300 hover:text-white hover:bg-white/5 transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full font-heading font-semibold uppercase tracking-[0.12em] text-slate-300 hover:text-white hover:bg-[#FF1493]/10 transition-all"
           >
-            <Scissors className="w-3.5 h-3.5 text-[#a8bed5]" />
-            Cortes 9:16
+            <Scissors className="w-3.5 h-3.5 text-[#ff80bf]" />
+            Edição 9:16
           </Link>
 
           <Link
             href="/manage-plan"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full font-heading font-semibold uppercase tracking-[0.12em] text-slate-300 hover:text-white hover:bg-white/5 transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full font-heading font-semibold uppercase tracking-[0.12em] text-slate-300 hover:text-white hover:bg-[#FF1493]/10 transition-all"
           >
-            <Share2 className="w-3.5 h-3.5 text-slate-400" />
-            Publicação
+            <Share2 className="w-3.5 h-3.5 text-[#ff80bf]" />
+            TikTok & Redes
           </Link>
         </nav>
 
         {/* CTA Button & Hardware Status */}
         <div className="flex items-center gap-3">
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 border border-[#e8d9c6]/20 text-[11px] font-heading uppercase tracking-[0.15em] text-[#e8d9c6]">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-black/60 border border-[#FF1493]/30 text-[11px] font-heading uppercase tracking-[0.15em] text-[#ff80bf]">
+            <span className="w-2 h-2 rounded-full bg-[#FF1493] animate-pulse" />
             RTX 3060 Ti • NVENC
           </div>
 

@@ -160,26 +160,113 @@ export function selectBestClip(segments, maxSeconds = DEFAULT_MAX_CLIP_SECONDS) 
     };
 }
 
-export function buildFfmpegCommand({ inputPath, outputPath, start, duration, useNvenc = true }) {
+export function buildFfmpegCommand({
+    inputPath,
+    outputPath,
+    start,
+    duration,
+    useNvenc = true,
+    subtitlePath = null,
+    hookHeadline = null,
+    normalizeAudio = false,
+}) {
     const videoCodecArgs = useNvenc
         ? ['-c:v', 'h264_nvenc', '-preset', 'p5', '-cq', '22', '-b:v', '6M']
         : ['-c:v', 'libx264', '-preset', 'fast', '-crf', '23'];
+
+    const filters = [
+        'scale=1080:1920:force_original_aspect_ratio=increase',
+        'crop=1080:1920:(iw-1080)/2:(ih-1920)/2',
+    ];
+
+    if (hookHeadline) {
+        const cleanHeadline = String(hookHeadline).replace(/['":\\]/g, ' ').slice(0, 50).trim();
+        filters.push(`drawbox=y=140:color=black@0.65:width=iw:height=130:t=fill`);
+        filters.push(`drawtext=text='${cleanHeadline}':fontcolor=white:fontsize=46:x=(w-text_w)/2:y=180:box=0`);
+    }
+
+    if (subtitlePath) {
+        const cleanPath = String(subtitlePath).replace(/\\/g, '/').replace(/:/g, '\\:');
+        filters.push(`subtitles='${cleanPath}'`);
+    }
 
     const command = [
         'ffmpeg', '-y',
         '-ss', String(start),
         '-i', String(inputPath),
         '-t', String(duration),
-        '-vf', 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(iw-1080)/2:(ih-1920)/2',
+        '-vf', filters.join(','),
         ...videoCodecArgs,
+    ];
+
+    if (normalizeAudio) {
+        command.push('-af', 'loudnorm=I=-14:LRA=7:TP=-1.5');
+    }
+
+    command.push(
         '-c:a', 'aac',
         '-b:a', '128k',
         String(outputPath),
-    ];
+    );
 
     return command.join(' ');
 }
 
+export function formatAssTimestamp(seconds) {
+    const total = Math.max(0, Number(seconds) || 0);
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+    const centis = Math.floor((total - Math.floor(total)) * 100);
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(Math.floor(secs)).padStart(2, '0')}.${String(centis).padStart(2, '0')}`;
+}
+
+export function buildAssSubtitle(segments, { maxSeconds = DEFAULT_MAX_CLIP_SECONDS, hookTitle = 'VIRAL SHORT' } = {}) {
+    const normalized = segments
+        .map((segment, index) => normalizeSegment(segment, index))
+        .filter(Boolean)
+        .slice(0, 100)
+        .sort((a, b) => a.start - b.start);
+
+    const header = `[Script Info]
+Title: ${hookTitle}
+ScriptType: v4.00+
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+YCbCr Matrix: None
+PlayResX: 1080
+PlayResY: 1920
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: ViralHormozi,Bricolage Grotesque,52,&H00FFFFFF,&H009314FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,2,2,40,40,320,1
+Style: HookBanner,Bricolage Grotesque,48,&H009314FF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,2,8,30,30,160,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`;
+
+    if (!normalized.length) return header;
+
+    const events = normalized.map((segment) => {
+        const start = Math.min(segment.start, maxSeconds);
+        const end = Math.min(segment.end, maxSeconds + 1);
+
+        // Destaca palavras-chave com a cor rosa choque Deep Pink (&H009314FF em BGR hex)
+        const words = segment.text.split(' ').map((word) => {
+            const clean = word.toLowerCase();
+            if (clean.length > 5 || clean.includes('!') || clean.includes('?')) {
+                return `{\\c&H009314FF&}${word}{\\c&H00FFFFFF&}`;
+            }
+            return word;
+        });
+
+        const textFormatted = words.join(' ');
+        return `Dialogue: 0,${formatAssTimestamp(start)},${formatAssTimestamp(end)},ViralHormozi,,0,0,0,,${textFormatted}`;
+    });
+
+    return header + events.join('\n');
+}
 
 export function buildSubtitle(segments, maxSeconds = DEFAULT_MAX_CLIP_SECONDS) {
     const normalized = segments
@@ -203,6 +290,7 @@ export function buildSubtitle(segments, maxSeconds = DEFAULT_MAX_CLIP_SECONDS) {
 
     return lines.join('\n');
 }
+
 
 export async function getLocalOllamaCutPlan(transcriptSegments, { model = DEFAULT_MODEL, url = process.env.OLLAMA_BASE_URL || 'http://localhost:11434' } = {}) {
     const apiUrl = new URL('/api/chat', url.endsWith('/v1') ? url.replace(/\/v1$/, '') : url).toString();
@@ -253,25 +341,51 @@ ${transcript}`,
     }
 }
 
-export function createClip({ inputPath, outputPath, transcriptSegments, maxSeconds = DEFAULT_MAX_CLIP_SECONDS }) {
+/**
+ * @param {Object} params
+ * @param {string} params.inputPath
+ * @param {string} params.outputPath
+ * @param {Array<any>} params.transcriptSegments
+ * @param {number} [params.maxSeconds]
+ * @param {string|null} [params.subtitlePath]
+ * @param {string|null} [params.hookHeadline]
+ * @param {boolean} [params.normalizeAudio]
+ */
+export function createClip({
+    inputPath,
+    outputPath,
+    transcriptSegments,
+    maxSeconds = DEFAULT_MAX_CLIP_SECONDS,
+    subtitlePath = null,
+    hookHeadline = null,
+    normalizeAudio = false,
+}) {
     const plan = selectBestClip(transcriptSegments, maxSeconds);
+    const resolvedHookHeadline = hookHeadline || plan.title;
+
     const cmd = buildFfmpegCommand({
         inputPath,
         outputPath,
         start: plan.start,
         duration: plan.duration,
+        subtitlePath,
+        hookHeadline: resolvedHookHeadline,
+        normalizeAudio,
     });
 
     const subtitle = buildSubtitle(transcriptSegments, maxSeconds);
+    const assSubtitle = buildAssSubtitle(transcriptSegments, { maxSeconds, hookTitle: plan.title });
 
     const result = {
         ...plan,
         subtitle,
+        assSubtitle,
         ffmpegCommand: cmd,
     };
 
     return result;
 }
+
 
 export function runClipPipeline({ inputPath, outputPath, transcriptSegments, maxSeconds = DEFAULT_MAX_CLIP_SECONDS }) {
     const plan = createClip({ inputPath, outputPath, transcriptSegments, maxSeconds });

@@ -39,6 +39,9 @@ export async function POST(request: Request) {
         const outputPath = path.join(uploadDir, `${baseName}-short.mp4`);
         const subtitlePath = `${outputPath}.srt`;
 
+        const hookHeadline = String(formData.get("hookHeadline") || "").trim();
+        const normalizeAudio = formData.get("normalizeAudio") === "true";
+
         const bytes = await file.arrayBuffer();
         await writeFile(inputPath, Buffer.from(bytes));
 
@@ -48,6 +51,8 @@ export async function POST(request: Request) {
             outputPath,
             transcriptSegments: segments,
             maxSeconds: 60,
+            hookHeadline: hookHeadline || null,
+            normalizeAudio,
         });
 
         const ffmpegArgs = plan.ffmpegCommand.split(' ').slice(1);
@@ -59,14 +64,18 @@ export async function POST(request: Request) {
         }
 
         await writeFile(subtitlePath, plan.subtitle || "");
+        const assSubtitlePath = `${outputPath}.ass`;
+        await writeFile(assSubtitlePath, plan.assSubtitle || "");
 
         return NextResponse.json({
             ok: true,
             fileName: path.basename(outputPath),
             mp4Url: `/generated/${path.basename(outputPath)}`,
             subtitleUrl: `/generated/${path.basename(subtitlePath)}`,
+            assSubtitleUrl: `/generated/${path.basename(assSubtitlePath)}`,
             plan,
         });
+
     } catch (error) {
         const message = error instanceof Error ? error.message : "Erro ao processar o vídeo.";
         return NextResponse.json({ ok: false, error: message }, { status: 500 });

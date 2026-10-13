@@ -28,16 +28,17 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-950 text-slate-100`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#14010e] text-slate-100`}
       >
         <ClientWrapper>
           <Header />
 
-          <main className="bg-slate-950">{children}</main>
+          <main className="bg-[#14010e]">{children}</main>
 
           <Toaster position="bottom-center" />
         </ClientWrapper>
       </body>
     </html>
+
   );
 }

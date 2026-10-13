@@ -35,6 +35,70 @@ export function calculateViralityScore({ views = 0, likes = 0, comments = 0 }) {
     return Math.min(99.9, Math.max(10, Math.round(rawScore * 10) / 10));
 }
 
+export async function fetchTopTrendingGlobal({
+    regionCode = 'BR',
+    maxResults = 8,
+    apiKey = process.env.YOUTUBE_API_KEY,
+} = {}) {
+    if (!apiKey) {
+        throw new Error('YOUTUBE_API_KEY não configurada no ambiente.');
+    }
+
+    const youtube = google.youtube({
+        version: 'v3',
+        auth: apiKey,
+    });
+
+    // 1. Busca os vídeos mais populares (Top Trending Charts) da região
+    const response = await youtube.videos.list({
+        part: ['snippet', 'statistics', 'contentDetails'],
+        chart: 'mostPopular',
+        regionCode,
+        maxResults: Math.min(25, maxResults * 2),
+    });
+
+    const detailedItems = response.data.items || [];
+
+    const candidates = detailedItems
+        .map((video) => {
+            const stats = video.statistics || {};
+            const snippet = video.snippet || {};
+            const contentDetails = video.contentDetails || {};
+
+            const views = Number(stats.viewCount || 0);
+            const likes = Number(stats.likeCount || 0);
+            const comments = Number(stats.commentCount || 0);
+            const durationSeconds = parseIsoDuration(contentDetails.duration);
+
+            const engagementRate = views > 0
+                ? Math.round(((likes + comments * 2) / views) * 10000) / 100
+                : 0;
+
+            const viralityScore = calculateViralityScore({ views, likes, comments });
+
+            return {
+                id: video.id,
+                title: snippet.title || 'Sem título',
+                channelTitle: snippet.channelTitle || 'Canal Desconhecido',
+                publishedAt: snippet.publishedAt,
+                thumbnail: snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || '',
+                views,
+                likes,
+                comments,
+                durationSeconds,
+                durationFormatted: formatDuration(durationSeconds),
+                engagementRate,
+                viralityScore,
+                url: `https://www.youtube.com/watch?v=${video.id}`,
+            };
+        })
+        .filter((v) => v.durationSeconds >= 30)
+        .sort((a, b) => b.viralityScore - a.viralityScore)
+        .slice(0, maxResults);
+
+    return candidates;
+}
+
 export async function searchYoutubeTrends({
     query = 'podcast tecnologia',
     maxResults = 8,
@@ -140,8 +204,8 @@ export async function selectViralVideoWithOllama(candidates, {
     const cleanBaseUrl = ollamaUrl.endsWith('/v1') ? ollamaUrl.replace(/\/v1$/, '') : ollamaUrl;
     const apiUrl = `${cleanBaseUrl}/api/chat`;
 
-    const prompt = `Você é o estrategista-chefe de conteúdo viral e especialista em retenção para YouTube Shorts e Instagram Reels.
-Analise os ${candidates.length} vídeos abaixo sobre o nicho "${niche}". Identifique qual deles possui o MAIOR POTENCIAL VIRAL para extrair cortes curtos de até 60 segundos com alto impacto emocional, curiosidade ou valor prático.
+    const prompt = `Você é o estrategista-chefe de conteúdo viral e especialista em retenção para TikTok (#fyp), YouTube Shorts e Instagram Reels.
+Analise os ${candidates.length} vídeos abaixo sobre o nicho "${niche}". Identifique qual deles possui o MAIOR POTENCIAL VIRAL para extrair cortes curtos de até 60 segundos com alto impacto emocional, quebra de padrão ou valor explosivo.
 
 Lista de candidatos com métricas reais:
 ${JSON.stringify(compactList, null, 2)}
@@ -152,6 +216,12 @@ Responda ESTRITAMENTE em formato JSON válido, sem texto adicional, com a seguin
   "url": "URL completa do vídeo",
   "title": "Título do vídeo",
   "viralScore": 95,
+  "curiosityGapScore": 92,
+  "patternInterruptScore": 88,
+  "emotionalResonance": 90,
+  "shareabilityFactor": 94,
+  "viralHookFormula": "Gatilho Contraintuitivo / Quebra de Expectativa",
+  "suggestedHeadline": "O SEGREDO QUE NINGUÉM TE CONTOU",
   "hookAnalysis": "Explicação de por que este tema prende a atenção nos primeiros 3 segundos",
   "whyViral": "Justificativa detalhada cruzando engajamento alto, audiência e apelo do assunto",
   "recommendedClipAngle": "Instrução para o editor de qual trecho/assunto focar no corte de 60s"
@@ -187,6 +257,12 @@ Responda ESTRITAMENTE em formato JSON válido, sem texto adicional, com a seguin
             title: matched.title,
             channelTitle: matched.channelTitle,
             thumbnail: matched.thumbnail,
+            curiosityGapScore: Number(parsed.curiosityGapScore) || 88,
+            patternInterruptScore: Number(parsed.patternInterruptScore) || 85,
+            emotionalResonance: Number(parsed.emotionalResonance) || 90,
+            shareabilityFactor: Number(parsed.shareabilityFactor) || 92,
+            viralHookFormula: parsed.viralHookFormula || "Quebra de Padrão & Revelação",
+            suggestedHeadline: parsed.suggestedHeadline || "REVELAÇÃO QUE MUDA TUDO",
             modelUsed: model,
             isAiSelected: true,
         };
@@ -202,8 +278,14 @@ Responda ESTRITAMENTE em formato JSON válido, sem texto adicional, com a seguin
             channelTitle: top.channelTitle,
             thumbnail: top.thumbnail,
             viralScore: top.viralityScore,
+            curiosityGapScore: Math.min(98, Math.round(top.viralityScore * 0.95)),
+            patternInterruptScore: Math.min(96, Math.round(top.viralityScore * 0.92)),
+            emotionalResonance: Math.min(99, Math.round(top.viralityScore * 0.94)),
+            shareabilityFactor: Math.min(97, Math.round(top.viralityScore * 0.96)),
+            viralHookFormula: "Quebra de Padrão & Curiosidade Contraintuitiva",
+            suggestedHeadline: "ISSO MUDA SEU JOGO AGORA",
             hookAnalysis: `Alta densidade de engajamento com ${top.likes.toLocaleString()} likes e taxa de ${top.engagementRate}% em relação a ${top.views.toLocaleString()} views.`,
-            whyViral: `Este conteúdo gerou mais interesse relativo no nicho de "${niche}", indicando forte ressonância emocional e gatilhos de retenção ideais para Shorts.`,
+            whyViral: `Este conteúdo gerou mais interesse relativo no nicho de "${niche}", indicando forte ressonância emocional e gatilhos de retenção ideais para TikTok e Shorts.`,
             recommendedClipAngle: 'Identificar o ápice do raciocínio ou revelação contraintuitiva no primeiro terço do vídeo.',
             modelUsed: 'heuristic-fallback',
             isAiSelected: false,

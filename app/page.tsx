@@ -81,18 +81,18 @@ const features = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[#06080e] text-slate-100 selection:bg-[#e8d9c6] selection:text-black">
-      {/* Hero Section inspired by Clinica Belvè Editorial Luxury */}
+    <div className="min-h-screen bg-[#14010e] text-slate-100 selection:bg-[#FF1493] selection:text-white">
+      {/* Hero Section com Estética Deep Pink #FF1493 */}
       <section className="relative pt-16 pb-28 px-4 overflow-hidden">
-        {/* Ambient Warm Champagne Glows */}
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[650px] h-[320px] bg-[#e8d9c6]/8 rounded-full blur-[140px] pointer-events-none" />
-        <div className="absolute top-32 right-10 w-[350px] h-[350px] bg-[#2e3188]/20 rounded-full blur-[140px] pointer-events-none" />
+        {/* Ambient Deep Pink #FF1493 Glows */}
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[650px] h-[320px] bg-[#FF1493]/15 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute top-32 right-10 w-[350px] h-[350px] bg-[#FF1493]/20 rounded-full blur-[140px] pointer-events-none" />
 
         <div className="container mx-auto max-w-5xl text-center relative z-10">
           <div className="inline-flex items-center gap-2 mb-8">
             <span className="belve-badge flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#e8d9c6] animate-ping" />
-              Inteligência de Conteúdo • Padrão Premium
+              <span className="w-2 h-2 rounded-full bg-[#FF1493] animate-ping" />
+              Inteligência Viral • Deep Pink Edition
             </span>
           </div>
 
@@ -100,6 +100,7 @@ export default function Home() {
             Domine o Algoritmo com <br />
             <span className="belve-gradient-text">IA Local & Tendências</span>
           </h1>
+
 
           <p className="text-base sm:text-lg md:text-xl text-slate-300 font-light max-w-2xl mx-auto mb-10 leading-relaxed">
             Descubra os vídeos mais virais do seu nicho, isole ganchos de alta retenção no Ollama
@@ -149,8 +150,8 @@ export default function Home() {
       {/* 2. SHORTS & REELS NVENC PIPELINE */}
       <ShortsPipelinePanel />
 
-      {/* 3. RECURSOS PREMIUM (Estilo Editorial Clinica Belvè) */}
-      <section className="py-24 px-4 bg-[#080b12] relative border-t border-b border-[#e8d9c6]/10">
+      {/* 3. RECURSOS PREMIUM (Estilo Editorial Deep Pink #FF1493) */}
+      <section className="py-24 px-4 bg-[#1a0213] relative border-t border-b border-[#FF1493]/15">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
             <span className="belve-badge mb-3 inline-block">Tecnologia & Sofisticação</span>
@@ -172,15 +173,15 @@ export default function Home() {
                 >
                   <div>
                     <div className="flex items-center justify-between mb-5">
-                      <div className="w-12 h-12 rounded-2xl bg-[#e8d9c6]/10 border border-[#e8d9c6]/30 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                        <Icon className="w-5 h-5 text-[#e8d9c6]" />
+                      <div className="w-12 h-12 rounded-2xl bg-[#FF1493]/15 border border-[#FF1493]/35 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                        <Icon className="w-5 h-5 text-[#FF1493]" />
                       </div>
                       <span className="text-[10px] font-heading font-semibold uppercase tracking-widest px-3 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300">
                         {feature.badge}
                       </span>
                     </div>
 
-                    <h3 className="font-heading text-xl font-bold uppercase tracking-tight text-white mb-2 group-hover:text-[#e8d9c6] transition-colors">
+                    <h3 className="font-heading text-xl font-bold uppercase tracking-tight text-white mb-2 group-hover:text-[#ff80bf] transition-colors">
                       {feature.title}
                     </h3>
                     <p className="text-xs md:text-sm text-slate-300 leading-relaxed font-light">
@@ -188,7 +189,7 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <div className="pt-6 mt-6 border-t border-white/5 flex items-center gap-1.5 text-[11px] font-heading uppercase tracking-wider text-[#e8d9c6]">
+                  <div className="pt-6 mt-6 border-t border-white/5 flex items-center gap-1.5 text-[11px] font-heading uppercase tracking-wider text-[#FF1493]">
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     <span>Pronto para uso</span>
                   </div>
@@ -200,7 +201,7 @@ export default function Home() {
       </section>
 
       {/* 4. FLUXO EM 3 PASSOS SIMPLES */}
-      <section className="py-24 px-4 bg-[#06080e]">
+      <section className="py-24 px-4 bg-[#14010e]">
         <div className="container mx-auto max-w-5xl">
           <div className="text-center mb-16">
             <span className="belve-badge mb-3 inline-block">Workflow Otimizado</span>
@@ -219,11 +220,11 @@ export default function Home() {
                   className="belve-card rounded-3xl p-8 text-center relative flex flex-col justify-between"
                 >
                   <div>
-                    <span className="font-heading text-4xl font-extrabold text-[#e8d9c6]/20 block mb-4">
+                    <span className="font-heading text-4xl font-extrabold text-[#FF1493]/20 block mb-4">
                       {s.step}
                     </span>
-                    <div className="w-14 h-14 rounded-full bg-[#e8d9c6]/10 border border-[#e8d9c6]/30 flex items-center justify-center mx-auto mb-5">
-                      <Icon className="w-6 h-6 text-[#e8d9c6]" />
+                    <div className="w-14 h-14 rounded-full bg-[#FF1493]/15 border border-[#FF1493]/35 flex items-center justify-center mx-auto mb-5">
+                      <Icon className="w-6 h-6 text-[#FF1493]" />
                     </div>
                     <h3 className="font-heading text-lg font-bold uppercase tracking-tight text-white mb-3">
                       {s.title}
@@ -240,23 +241,24 @@ export default function Home() {
       </section>
 
       {/* Footer Luxury CTA */}
-      <footer className="py-16 px-4 bg-[#05070a] border-t border-[#e8d9c6]/15 text-center">
+      <footer className="py-16 px-4 bg-[#0e0108] border-t border-[#FF1493]/20 text-center">
         <div className="container mx-auto max-w-4xl">
           <span className="font-heading text-2xl font-bold tracking-[0.18em] uppercase text-white block mb-2">
-            Limbo<span className="text-[#e8d9c6]">.</span>AI
+            Limbo<span className="text-[#FF1493]">.</span>AI
           </span>
-          <p className="text-xs text-[#a8bed5] tracking-[0.2em] uppercase font-semibold mb-6">
+          <p className="text-xs text-[#ff80bf] tracking-[0.2em] uppercase font-semibold mb-6">
             Inteligência de Conteúdo Local • RTX 3060 Ti & Ollama
           </p>
           <div className="flex justify-center gap-4 text-xs text-slate-400 font-heading uppercase tracking-wider">
-            <a href="#trend-hunter" className="hover:text-[#e8d9c6] transition">Trend Hunter</a>
+            <a href="#trend-hunter" className="hover:text-[#FF1493] transition">Trend Hunter</a>
             <span>•</span>
-            <a href="#shorts" className="hover:text-[#e8d9c6] transition">Shorts 9:16</a>
+            <a href="#shorts" className="hover:text-[#FF1493] transition">Shorts 9:16</a>
             <span>•</span>
-            <a href="/manage-plan" className="hover:text-[#e8d9c6] transition">Publicação</a>
+            <a href="/manage-plan" className="hover:text-[#FF1493] transition">Publicação</a>
           </div>
         </div>
       </footer>
     </div>
   );
 }
+
