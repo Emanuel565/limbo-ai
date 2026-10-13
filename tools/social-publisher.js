@@ -25,13 +25,22 @@ export function getGraphApiBase(token = '') {
 /**
  * Formata legendas com hashtags hiper-otimizadas para o algoritmo de cada rede
  */
-export function formatSocialCaptions({ title, description, tiktokHandle, instagramHandle }) {
+export function formatSocialCaptions({ title, description, tiktokHandle, instagramHandle, niche = 'valorant' }) {
     const cleanTitle = String(title || '').trim();
     const cleanDesc = String(description || '').trim();
+    const isValorant = niche === 'valorant' || /valorant|clutch|vandal|phantom|reyna|jett|sova|omen|sage|cypher|radiante|elo|vct|spike|ace|headshot|hs/i.test(`${cleanTitle} ${cleanDesc}`);
 
-    const tiktokTags = ['#fyp', '#foryou', '#viral', '#tiktokbrasil', '#aprendanotiktok', '#cortesvirais'];
-    const instagramTags = ['#reels', '#viral', '#explore', '#reelsbrasil', '#marketingdigital', '#conteudodevalor'];
-    const youtubeTags = ['#shorts', '#viralcontent', '#cortes'];
+    const tiktokTags = isValorant
+        ? ['#valorant', '#valorantbrasil', '#valorantclips', '#valoranthighlights', '#valorantgaming', '#clutch', '#vct', '#tiktokbrasil', '#fyp', '#viral', '#gamesnotiktok']
+        : ['#fyp', '#foryou', '#viral', '#tiktokbrasil', '#cortesvirais'];
+
+    const instagramTags = isValorant
+        ? ['#valorant', '#valorantbrasil', '#valorantclips', '#valoranthighlights', '#reels', '#clutch', '#vct', '#gamer', '#reelsbrasil', '#explore']
+        : ['#reels', '#viral', '#explore', '#reelsbrasil', '#conteudodevalor'];
+
+    const youtubeTags = isValorant
+        ? ['#valorant', '#valorantshorts', '#valorantbrasil', '#clutch', '#shorts']
+        : ['#shorts', '#viralcontent', '#cortes'];
 
     return {
         tiktok: {

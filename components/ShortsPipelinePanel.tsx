@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { Play, Sparkles, TestTube, Film, Cpu, CheckCircle2, Scissors } from "lucide-react";
+import { Play, Sparkles, TestTube, Film, Cpu, CheckCircle2, Scissors, Send, Flame, Target, Crosshair, ArrowRight, ExternalLink } from "lucide-react";
 
 interface ShortPlan {
     title: string;
@@ -19,14 +19,44 @@ interface TestResult {
     stderr?: string;
 }
 
-const sampleTranscript = `Você precisa ouvir isso agora porque este insight muda completamente a forma como você cria conteúdo.
-Este é o momento mais importante da estratégia: captar atenção em poucos segundos e entregar valor imediato.
-Quando a mensagem está clara, a retenção sobe e a audiência entende a proposta antes mesmo de clicar em seguir.`;
+const valorantPresets = [
+    {
+        id: "clutch",
+        label: "💀 Clutch 1v5",
+        headline: "CLUTCH 1V5 IMPOSSÍVEL NO VALORANT 💀",
+        transcript: `1 HP e contra 5 no spike. Todo mundo falou pra salvar a Vandal, mas quando você confia na mira não tem volta. Assiste esse ace insano na Ascent!`,
+    },
+    {
+        id: "lineup",
+        label: "🎯 Lineup Ascent",
+        headline: "ESSA LINEUP NA ASCENT É PROIBIDA 🎯",
+        transcript: `Essa lineup de Sova e Viper na Ascent é proibida em campeonato. Se você alinhar a mira exatamente nessa quina do telhado, o dardo cai direto no defuse sem chance de reação!`,
+    },
+    {
+        id: "aim",
+        label: "🔥 Mira do Aspas",
+        headline: "O SEGREDO DA MIRA DO ASPAS NO VALORANT 🔥",
+        transcript: `Pare de culpar a sua mira se você tá jogando com a sensibilidade errada. Essa configuração de crosshair e DPI é o que os profissionais usam pra cravar 40% de Headshot!`,
+    },
+    {
+        id: "hottake",
+        label: "⛔ Pare de Jogar de Reyna",
+        headline: "PARE DE JOGAR DE REYNA SE QUER SUBIR ⛔",
+        transcript: `Você joga de Reyna mas fica preso no Prata? É exatamente por isso que o seu elo não sobe. Duelista sem utilitário só afunda o time se você não matar 3 por round.`,
+    },
+    {
+        id: "vct",
+        label: "👑 Jogada VCT",
+        headline: "A JOGADA MAIS GENIAL DO VCT BRASIL 👑",
+        transcript: `Essa jogada no VCT quebrou o meta do jogo. Olha a leitura de jogo perfeita pra dominar o bomb A em 4 segundos e fechar o round decisivo!`,
+    },
+];
 
 export default function ShortsPipelinePanel() {
-    const [transcript, setTranscript] = useState(sampleTranscript);
+    const [selectedPreset, setSelectedPreset] = useState<string>("clutch");
+    const [transcript, setTranscript] = useState(valorantPresets[0].transcript);
     const [videoUrl, setVideoUrl] = useState("");
-    const [hookHeadline, setHookHeadline] = useState("O SEGREDO QUE NINGUÉM CONTA");
+    const [hookHeadline, setHookHeadline] = useState(valorantPresets[0].headline);
     const [normalizeAudio, setNormalizeAudio] = useState(true);
     const [assSubtitles, setAssSubtitles] = useState(true);
     const [dynamicZoom, setDynamicZoom] = useState(true);
@@ -40,6 +70,12 @@ export default function ShortsPipelinePanel() {
     const [videoFile, setVideoFile] = useState<File | null>(null);
     const [generated, setGenerated] = useState<{ mp4Url?: string; subtitleUrl?: string; assSubtitleUrl?: string } | null>(null);
     const [error, setError] = useState("");
+
+    // Publicação de API
+    const [publishPlatform, setPublishPlatform] = useState<"both" | "tiktok" | "instagram">("both");
+    const [publishing, setPublishing] = useState(false);
+    const [publishResult, setPublishResult] = useState<any>(null);
+    const [publishError, setPublishError] = useState("");
 
     // Ouve eventos disparados pelo Trend Hunter
     useEffect(() => {
@@ -177,6 +213,50 @@ export default function ShortsPipelinePanel() {
         }
     }
 
+    function handleSelectPreset(preset: (typeof valorantPresets)[0]) {
+        setSelectedPreset(preset.id);
+        setHookHeadline(preset.headline);
+        setTranscript(preset.transcript);
+    }
+
+    async function handlePublishToSocial() {
+        setPublishing(true);
+        setPublishError("");
+        setPublishResult(null);
+
+        try {
+            const videoPath = generated?.mp4Url
+                ? `${window.location.origin}${generated.mp4Url}`
+                : `${window.location.origin}/generated/short-viral.mp4`;
+
+            const res = await fetch("/api/social-publish", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    platform: publishPlatform,
+                    title: hookHeadline,
+                    description: transcript,
+                    videoUrl: videoPath,
+                    tiktokHandle: "@Limbo",
+                    instagramHandle: "@limboinpink",
+                    action: "publish",
+                }),
+            });
+
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || "Falha ao publicar nas redes sociais.");
+            }
+
+            setPublishResult(data);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Erro ao disparar publicação.";
+            setPublishError(message);
+        } finally {
+            setPublishing(false);
+        }
+    }
+
     return (
         <section id="shorts" className="py-24 px-4 relative overflow-hidden bg-[#14010e]">
             <div className="container mx-auto max-w-6xl relative z-10">
@@ -225,6 +305,34 @@ export default function ShortsPipelinePanel() {
                                 </button>
                             </div>
                         )}
+
+                        {/* Nicho Valorant - Presets de Ganchos Virais */}
+                        <div className="mb-5 p-4 rounded-2xl bg-black/60 border border-[#FF1493]/30">
+                            <div className="flex items-center justify-between mb-2.5">
+                                <label className="text-xs font-heading font-semibold uppercase tracking-wider text-[#FF1493] flex items-center gap-1.5">
+                                    <Flame className="w-4 h-4 text-[#FF1493]" /> Presets Virais de Valorant (TikTok & Reels)
+                                </label>
+                                <span className="text-[10px] text-emerald-400 font-mono bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                                    Nicho: FPS Competitivo
+                                </span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {valorantPresets.map((preset) => (
+                                    <button
+                                        key={preset.id}
+                                        type="button"
+                                        onClick={() => handleSelectPreset(preset)}
+                                        className={`px-3 py-1.5 rounded-xl text-[11px] font-heading font-bold transition cursor-pointer border ${
+                                            selectedPreset === preset.id
+                                                ? "bg-[#FF1493] text-white border-[#FF1493] shadow-md shadow-[#FF1493]/30"
+                                                : "bg-black/50 text-slate-300 border-white/10 hover:border-[#FF1493]/40 hover:text-white"
+                                        }`}
+                                    >
+                                        {preset.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
                         {/* Viral Hook Headline Input */}
                         <div className="mb-5">
@@ -495,6 +603,109 @@ export default function ShortsPipelinePanel() {
                                                 📄 Baixar Legenda Padrão (.srt)
                                             </a>
                                         )}
+                                    </div>
+
+                                    {/* Seção de Publicação Direta via API (TikTok & Instagram) */}
+                                    <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-heading font-bold text-xs uppercase tracking-wider text-white flex items-center gap-1.5">
+                                                <Send className="w-4 h-4 text-[#FF1493]" /> Publicar via API Oficial
+                                            </span>
+                                            <span className="text-[10px] text-emerald-400 font-mono bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                                                TikTok (@Limbo) + Insta (@limboinpink)
+                                            </span>
+                                        </div>
+
+                                        <p className="text-[11px] text-slate-300 leading-relaxed">
+                                            Dispare este corte de Valorant diretamente para as contas conectadas com legendas algorítmicas e hashtags virais.
+                                        </p>
+
+                                        {/* Platform Selection */}
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setPublishPlatform("both")}
+                                                className={`p-2 rounded-xl text-[10px] font-heading font-bold uppercase transition border ${
+                                                    publishPlatform === "both"
+                                                        ? "bg-[#FF1493] text-white border-[#FF1493]"
+                                                        : "bg-black/50 text-slate-300 border-white/10 hover:border-[#FF1493]/40"
+                                                }`}
+                                            >
+                                                🚀 Ambas as Redes
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPublishPlatform("tiktok")}
+                                                className={`p-2 rounded-xl text-[10px] font-heading font-bold uppercase transition border ${
+                                                    publishPlatform === "tiktok"
+                                                        ? "bg-[#FF1493] text-white border-[#FF1493]"
+                                                        : "bg-black/50 text-slate-300 border-white/10 hover:border-[#FF1493]/40"
+                                                }`}
+                                            >
+                                                🎵 TikTok (@Limbo)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPublishPlatform("instagram")}
+                                                className={`p-2 rounded-xl text-[10px] font-heading font-bold uppercase transition border ${
+                                                    publishPlatform === "instagram"
+                                                        ? "bg-pink-600 text-white border-pink-500"
+                                                        : "bg-black/50 text-slate-300 border-white/10 hover:border-pink-500/40"
+                                                }`}
+                                            >
+                                                📸 Instagram (@limboinpink)
+                                            </button>
+                                        </div>
+
+                                        {/* Publish Button */}
+                                        <button
+                                            type="button"
+                                            onClick={handlePublishToSocial}
+                                            disabled={publishing}
+                                            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#FF1493] to-pink-600 hover:opacity-95 text-white font-heading font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg shadow-[#FF1493]/30"
+                                        >
+                                            <Send className="w-3.5 h-3.5" />
+                                            {publishing ? "Enviando para as APIs Oficiais..." : "Publicar Agora nas Redes (1-Clique)"}
+                                        </button>
+
+                                        {/* Publish Feedback */}
+                                        {publishResult && (
+                                            <div className="p-3 rounded-xl bg-black/80 border border-emerald-500/30 text-[11px] space-y-1.5 font-mono">
+                                                <div className="text-emerald-400 font-bold flex items-center gap-1">
+                                                    <CheckCircle2 className="w-3.5 h-3.5" /> {publishResult.message}
+                                                </div>
+                                                {publishResult.results?.tiktok && (
+                                                    <div className="text-slate-300">
+                                                        🎵 TikTok: <span className="text-emerald-300 font-bold">{publishResult.results.tiktok.mode || publishResult.results.tiktok.status}</span>
+                                                    </div>
+                                                )}
+                                                {publishResult.results?.instagram && (
+                                                    <div className="text-slate-300">
+                                                        📸 Instagram: <span className="text-pink-300 font-bold">{publishResult.results.instagram.mode || publishResult.results.instagram.status}</span>
+                                                        {publishResult.results.instagram.permalink && (
+                                                            <a href={publishResult.results.instagram.permalink} target="_blank" rel="noreferrer" className="text-[#FF1493] underline ml-1">
+                                                                Ver Postagem
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {publishError && (
+                                            <div className="p-2.5 rounded-xl bg-rose-950/50 border border-rose-500/40 text-rose-300 text-[11px]">
+                                                {publishError}
+                                            </div>
+                                        )}
+
+                                        <div className="text-center pt-1">
+                                            <a
+                                                href="#social"
+                                                className="text-[10px] text-pink-300 hover:text-white inline-flex items-center gap-1 font-heading uppercase tracking-wider underline"
+                                            >
+                                                Gerenciar Credenciais & Auditoria em #social <ExternalLink className="w-2.5 h-2.5" />
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             )}

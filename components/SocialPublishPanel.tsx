@@ -22,11 +22,11 @@ import {
     Lock,
 } from "lucide-react";
 
-const defaultDescription = `🔥 Corte pronto para retenção máxima
+const defaultDescription = `🔥 Clutch insano no competitivo de Valorant!
+📌 1 HP no relógio, spike plantado e mira calibrada na cabeça.
+👉 Me segue para mais jogadas e lineups diárias!
 
-📌 A mensagem principal está no início do vídeo para reter o espectador nos primeiros 3 segundos.
-
-#shorts #reels #viralcontent #marketingdigital #criadores`;
+#valorant #valorantbrasil #valorantclips #vct #clutch`;
 
 interface AccountAnalysis {
     platform: "tiktok" | "instagram";
@@ -110,10 +110,10 @@ interface PublishResult {
 }
 
 export default function SocialPublishPanel() {
-    const [youtubeHandle, setYoutubeHandle] = useState("");
-    const [instagramHandle, setInstagramHandle] = useState("@emanuel.reels");
-    const [tiktokHandle, setTiktokHandle] = useState("@emanuel.cortes");
-    const [title, setTitle] = useState("O Segredo que Ninguém Te Conta");
+    const [youtubeHandle, setYoutubeHandle] = useState("@emanuel.shorts");
+    const [instagramHandle, setInstagramHandle] = useState("@limboinpink");
+    const [tiktokHandle, setTiktokHandle] = useState("@Limbo");
+    const [title, setTitle] = useState("CLUTCH 1V5 IMPOSSÍVEL NO VALORANT 💀");
     const [description, setDescription] = useState(defaultDescription);
     const [videoUrl, setVideoUrl] = useState("/generated/short-viral.mp4");
     const [platform, setPlatform] = useState("all");
