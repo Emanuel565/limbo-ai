@@ -1,7 +1,5 @@
 "use client";
 
-import { SchematicProvider } from "@schematichq/schematic-react";
-import SchematicWrapped from "./SchematicWrapped";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 
 export default function ClientWrapper({
@@ -9,17 +7,5 @@ export default function ClientWrapper({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const schematicPubKey = process.env.NEXT_PUBLIC_SCHEMATIC_PUBLISHABLE_KEY;
-
-  if (!schematicPubKey) {
-    return <ConvexClientProvider>{children}</ConvexClientProvider>;
-  }
-
-  return (
-    <ConvexClientProvider>
-      <SchematicProvider publishableKey={schematicPubKey}>
-        <SchematicWrapped>{children}</SchematicWrapped>
-      </SchematicProvider>
-    </ConvexClientProvider>
-  );
+  return <ConvexClientProvider>{children}</ConvexClientProvider>;
 }

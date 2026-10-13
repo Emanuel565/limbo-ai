@@ -1,12 +1,21 @@
 {
-  "name": "ai-agent-challenge",
-  "version": "0.1.0",
+  "name": "limbo-ai",
+  "version": "1.0.0",
+  "description": "Plataforma de inteligência para conteúdo do YouTube com IA local, Trend Hunter e renderização NVENC",
+  "author": "Emanuel565",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Emanuel565/limbo-ai.git"
+  },
   "private": true,
+
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:shorts": "node --test tools/viral-short-pipeline.test.js",
+    "shorts:plan": "node tools/viral-short-pipeline.js"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.1.11",

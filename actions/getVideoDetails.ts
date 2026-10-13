@@ -5,9 +5,9 @@ import { VideoDetails } from "@/types/types";
 
 const youtube = process.env.YOUTUBE_API_KEY
   ? google.youtube({
-      version: "v3",
-      auth: process.env.YOUTUBE_API_KEY,
-    })
+    version: "v3",
+    auth: process.env.YOUTUBE_API_KEY,
+  })
   : null;
 
 async function getFallbackVideoDetails(videoId: string): Promise<VideoDetails | null> {

@@ -1,14 +1,11 @@
-import SchematicComponent from '@/components/schematic/SchematicComponent';
+import SocialPublishPanel from '@/components/SocialPublishPanel';
 
 function ManagePlan() {
   return (
-    <div className="container mx-auto p-4 md:p-0">
-      <h1 className="text-2xl font-bold mb-4 my-8">Manage Your Plan</h1>
-      <p className="text-gray-600 mb-8">
-        Manage your subscription and billing details here.
-      </p>
-
-      <SchematicComponent componentId="cmpn_WcbpVg75war" />
+    <div className="min-h-screen bg-[#06080e] text-slate-100 py-12">
+      <div className="container mx-auto px-4">
+        <SocialPublishPanel />
+      </div>
     </div>
   );
 }

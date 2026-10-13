@@ -45,7 +45,8 @@ function AnalysisPage() {
       <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-950/60 border border-amber-700 rounded-full">
         <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
         <p className="text-sm text-amber-200">
-          Modo IA local ativo: esta análise não consome tokens externos. <br />
+          Você está no Limbo. Validação local ativa: a IA processa no seu
+          ambiente e não consome tokens externos. <br />
           <span className="font-semibold">
             O processamento acontece no seu ambiente local.
           </span>
@@ -55,8 +56,8 @@ function AnalysisPage() {
       <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-950/60 border border-emerald-700 rounded-full">
         <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
         <p className="text-sm text-emerald-200">
-          Este vídeo já foi analisado — a IA local não usa tokens extras em
-          chamadas futuras. <br />
+          Você está no Limbo. Validação local confirmada: a IA continua usando
+          processamento local, sem tokens extras em chamadas futuras. <br />
         </p>
       </div>
     );

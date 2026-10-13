@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @plugin "tailwindcss-animate";
@@ -6,9 +7,11 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: var(--font-geist-sans);
+  --font-sans: 'Plus Jakarta Sans', var(--font-geist-sans), sans-serif;
+  --font-heading: 'Bricolage Grotesque', sans-serif;
   --font-mono: var(--font-geist-mono);
 }
+
 
 :root {
   --card: oklch(1 0 0);
@@ -126,5 +129,104 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    letter-spacing: -0.02em;
   }
 }
+
+/* Clinica Belvè Premium Aesthetics System */
+.font-heading {
+  font-family: 'Bricolage Grotesque', sans-serif;
+}
+
+.belve-pill-nav {
+  background: rgba(14, 18, 27, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(232, 217, 198, 0.22);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6), 0 0 20px -5px rgba(232, 217, 198, 0.08);
+}
+
+.belve-card {
+  background: radial-gradient(120% 120% at 50% 0%, rgba(20, 26, 38, 0.7) 0%, rgba(10, 13, 20, 0.95) 100%);
+  border: 1px solid rgba(232, 217, 198, 0.18);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.belve-card:hover {
+  border-color: rgba(232, 217, 198, 0.4);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 25px -5px rgba(232, 217, 198, 0.12);
+}
+
+.belve-badge {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  background: rgba(232, 217, 198, 0.1);
+  color: #e8d9c6;
+  border: 1px solid rgba(232, 217, 198, 0.28);
+}
+
+.belve-badge-blue {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  background: rgba(46, 49, 136, 0.25);
+  color: #a8bed5;
+  border: 1px solid rgba(168, 190, 213, 0.35);
+}
+
+.belve-btn-champagne {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  background-color: #e8d9c6;
+  color: #0a0a0a;
+  border-radius: 9999px;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 15px rgba(232, 217, 198, 0.25);
+}
+
+.belve-btn-champagne:hover {
+  background-color: #f4ece1;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(232, 217, 198, 0.4);
+}
+
+.belve-btn-outline {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.03);
+  color: #e8d9c6;
+  border: 1px solid rgba(232, 217, 198, 0.3);
+  border-radius: 9999px;
+  transition: all 0.25s ease;
+}
+
+.belve-btn-outline:hover {
+  background: rgba(232, 217, 198, 0.12);
+  border-color: #e8d9c6;
+  transform: translateY(-1px);
+}
+
+.belve-gradient-text {
+  background: linear-gradient(135deg, #ffffff 0%, #f4ece1 40%, #e8d9c6 75%, #a8bed5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+

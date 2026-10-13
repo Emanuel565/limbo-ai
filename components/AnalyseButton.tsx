@@ -1,17 +1,17 @@
 "use client";
 
-import { useFormStatus } from "react-dom";
+import { ArrowRight, Sparkles } from "lucide-react";
 
-function AnalyseButton() {
-  const { pending } = useFormStatus();
-
+function AnalyseButton({ pending = false }: { pending?: boolean }) {
   return (
     <button
       type="submit"
       disabled={pending}
-      className="px-6 py-3 text-white bg-blue-600 rounded-lg hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium"
+      className="belve-btn-champagne px-7 py-3.5 text-xs inline-flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shadow-lg shadow-[#e8d9c6]/20"
     >
-      {pending ? "Analisando..." : "Analisar"}
+      <Sparkles className="w-3.5 h-3.5" />
+      <span>{pending ? "Analisando..." : "Analisar com IA"}</span>
+      <ArrowRight className="h-3.5 w-3.5" />
     </button>
   );
 }
