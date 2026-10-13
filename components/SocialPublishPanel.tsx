@@ -141,6 +141,8 @@ export default function SocialPublishPanel() {
         instagram?: { hasToken: boolean; maskedToken: string; username?: string; accountId?: string };
     }>({});
 
+    const [refreshingToken, setRefreshingToken] = useState(false);
+
     async function handleExchangeCode() {
         if (!tiktokAuthCode.trim()) return;
         setExchangingCode(true);
@@ -164,6 +166,24 @@ export default function SocialPublishPanel() {
             setError(message);
         } finally {
             setExchangingCode(false);
+        }
+    }
+
+    async function handleRefreshTikTokToken() {
+        setRefreshingToken(true);
+        setError("");
+        try {
+            const res = await fetch("/api/auth/tiktok/refresh", { method: "POST" });
+            const data = await res.json();
+            if (!res.ok || !data.ok) throw new Error(data.error || "Erro ao renovar token.");
+            setCredsSuccessMsg("✓ Token de acesso renovado por mais 24h automaticamente!");
+            const fresh = await fetch("/api/social-credentials").then((r) => r.json());
+            if (fresh.ok && fresh.credentials) setCredsStatus(fresh.credentials);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Falha ao renovar token.";
+            setError(message);
+        } finally {
+            setRefreshingToken(false);
         }
     }
 
@@ -465,6 +485,27 @@ export default function SocialPublishPanel() {
                                         className="w-full rounded-xl border border-white/15 bg-black/60 px-3 py-2 text-xs text-white font-mono outline-none focus:border-[#FF1493]"
                                     />
                                 </div>
+
+                                {credsStatus.tiktok?.hasToken && (
+                                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30">
+                                        <div>
+                                            <div className="text-[10px] text-emerald-300 font-bold flex items-center gap-1">
+                                                ✓ Token Ativo (24h) • Auto-Renovação 365d
+                                            </div>
+                                            <div className="text-[9px] text-slate-400">
+                                                Renovação automática sem precisar logar de novo
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleRefreshTikTokToken}
+                                            disabled={refreshingToken}
+                                            className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[10px] font-bold transition disabled:opacity-50 cursor-pointer whitespace-nowrap border border-emerald-500/30"
+                                        >
+                                            {refreshingToken ? "Renovando..." : "↻ Renovar"}
+                                        </button>
+                                    </div>
+                                )}
 
                                 <a
                                     href="https://developers.tiktok.com/"
