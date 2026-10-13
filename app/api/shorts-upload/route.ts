@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { createClip, resolveFfmpegBinary } from "@/tools/viral-short-pipeline.js";
+import { createClip, renderClip } from "@/tools/viral-short-pipeline.js";
 
 function buildSegmentsFromTranscript(transcript: string) {
     const sentences = transcript
@@ -41,31 +41,30 @@ export async function POST(request: Request) {
 
         const hookHeadline = String(formData.get("hookHeadline") || "").trim();
         const normalizeAudio = formData.get("normalizeAudio") === "true";
+        const burnSubtitles = formData.get("burnSubtitles") !== "false";
+        const assFileName = `${baseName}-short.mp4.ass`;
+        const assSubtitlePath = path.join(uploadDir, assFileName);
 
         const bytes = await file.arrayBuffer();
         await writeFile(inputPath, Buffer.from(bytes));
 
         const segments = buildSegmentsFromTranscript(transcript || file.name);
+        // FFmpeg roda com cwd = uploadDir, então entrada/saída/legenda vão por nome de arquivo
         const plan = createClip({
-            inputPath,
-            outputPath,
+            inputPath: path.basename(inputPath),
+            outputPath: path.basename(outputPath),
             transcriptSegments: segments,
             maxSeconds: 60,
             hookHeadline: hookHeadline || null,
+            subtitlePath: burnSubtitles ? assFileName : null,
             normalizeAudio,
         });
 
-        const ffmpegArgs = plan.ffmpegCommand.split(' ').slice(1);
-        const { spawnSync } = await import("node:child_process");
-        const result = spawnSync(resolveFfmpegBinary(), ffmpegArgs, { stdio: "inherit", shell: false });
-
-        if (result.status !== 0) {
-            throw new Error(`FFmpeg failed with status ${result.status}`);
-        }
-
+        // Legendas precisam existir ANTES da renderização para serem queimadas no vídeo
         await writeFile(subtitlePath, plan.subtitle || "");
-        const assSubtitlePath = `${outputPath}.ass`;
         await writeFile(assSubtitlePath, plan.assSubtitle || "");
+
+        renderClip(plan, { cwd: uploadDir });
 
         return NextResponse.json({
             ok: true,

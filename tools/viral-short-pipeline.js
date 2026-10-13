@@ -160,7 +160,27 @@ export function selectBestClip(segments, maxSeconds = DEFAULT_MAX_CLIP_SECONDS) 
     };
 }
 
-export function buildFfmpegCommand({
+// Cadeia de áudio "voz de podcast": corta graves inúteis, reduz ruído, comprime e normaliza para -14 LUFS (padrão TikTok/Shorts/Reels)
+export const VIRAL_AUDIO_CHAIN = 'highpass=f=80,afftdn=nf=-25,acompressor=threshold=-18dB:ratio=3:attack=5:release=60:makeup=2,loudnorm=I=-14:LRA=7:TP=-1.5';
+
+function sanitizeDrawtext(text) {
+    return String(text).replace(/['":\\%,;]/g, ' ').replace(/\s+/g, ' ').slice(0, 50).trim();
+}
+
+/**
+ * Monta os argumentos do FFmpeg como ARRAY (sem shell), evitando quebra com espaços em caminhos e textos.
+ * @param {Object} params
+ * @param {string} params.inputPath
+ * @param {string} params.outputPath
+ * @param {number} params.start
+ * @param {number} params.duration
+ * @param {boolean} [params.useNvenc]
+ * @param {string|null} [params.subtitlePath] Caminho do .ass (de preferência relativo ao cwd do processo)
+ * @param {string|null} [params.hookHeadline] Usado via drawtext somente quando não há .ass (o .ass já desenha a tarja)
+ * @param {boolean} [params.normalizeAudio]
+ * @param {boolean} [params.progressBar]
+ */
+export function buildFfmpegArgs({
     inputPath,
     outputPath,
     start,
@@ -169,47 +189,66 @@ export function buildFfmpegCommand({
     subtitlePath = null,
     hookHeadline = null,
     normalizeAudio = false,
+    progressBar = true,
 }) {
-    const videoCodecArgs = useNvenc
-        ? ['-c:v', 'h264_nvenc', '-preset', 'p5', '-cq', '22', '-b:v', '6M']
-        : ['-c:v', 'libx264', '-preset', 'fast', '-crf', '23'];
+    const safeDuration = Math.max(1, Number(duration) || 1);
 
     const filters = [
-        'scale=1080:1920:force_original_aspect_ratio=increase',
+        'scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos',
         'crop=1080:1920:(iw-1080)/2:(ih-1920)/2',
+        'setsar=1',
+        'fps=30',
     ];
 
-    if (hookHeadline) {
-        const cleanHeadline = String(hookHeadline).replace(/['":\\]/g, ' ').slice(0, 50).trim();
-        filters.push(`drawbox=y=140:color=black@0.65:width=iw:height=130:t=fill`);
-        filters.push(`drawtext=text='${cleanHeadline}':fontcolor=white:fontsize=46:x=(w-text_w)/2:y=180:box=0`);
+    if (hookHeadline && !subtitlePath) {
+        filters.push('drawbox=y=140:color=black@0.65:width=iw:height=130:t=fill');
+        filters.push(`drawtext=text='${sanitizeDrawtext(hookHeadline)}':fontcolor=white:fontsize=46:x=(w-text_w)/2:y=180`);
     }
 
     if (subtitlePath) {
         const cleanPath = String(subtitlePath).replace(/\\/g, '/').replace(/:/g, '\\:');
-        filters.push(`subtitles='${cleanPath}'`);
+        filters.push(`ass='${cleanPath}'`);
     }
 
-    const command = [
-        'ffmpeg', '-y',
+    if (progressBar) {
+        // Barra de progresso rosa #FF1493 no rodapé: aumenta a retenção (o espectador vê que falta pouco)
+        filters.push(`drawbox=x=0:y=ih-14:w='iw*t/${safeDuration}':h=14:color=0xFF1493@0.95:t=fill`);
+    }
+
+    const videoCodecArgs = useNvenc
+        ? ['-c:v', 'h264_nvenc', '-preset', 'p6', '-tune', 'hq', '-rc', 'vbr', '-cq', '19',
+            '-b:v', '10M', '-maxrate', '16M', '-bufsize', '20M', '-profile:v', 'high', '-g', '60']
+        : ['-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-profile:v', 'high', '-g', '60'];
+
+    const args = [
+        '-y',
         '-ss', String(start),
         '-i', String(inputPath),
-        '-t', String(duration),
+        '-t', String(safeDuration),
         '-vf', filters.join(','),
         ...videoCodecArgs,
+        '-pix_fmt', 'yuv420p',
     ];
 
     if (normalizeAudio) {
-        command.push('-af', 'loudnorm=I=-14:LRA=7:TP=-1.5');
+        args.push('-af', VIRAL_AUDIO_CHAIN);
     }
 
-    command.push(
+    args.push(
         '-c:a', 'aac',
-        '-b:a', '128k',
+        '-b:a', '192k',
+        '-ar', '48000',
+        '-movflags', '+faststart',
         String(outputPath),
     );
 
-    return command.join(' ');
+    return args;
+}
+
+/** Versão legível (apenas para exibição/log). Para executar, use buildFfmpegArgs. */
+export function buildFfmpegCommand(params) {
+    const quote = (arg) => (/[\s'"]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg);
+    return ['ffmpeg', ...buildFfmpegArgs(params).map(quote)].join(' ');
 }
 
 export function formatAssTimestamp(seconds) {
@@ -221,65 +260,126 @@ export function formatAssTimestamp(seconds) {
     return `${hours}:${String(minutes).padStart(2, '0')}:${String(Math.floor(secs)).padStart(2, '0')}.${String(centis).padStart(2, '0')}`;
 }
 
-export function buildAssSubtitle(segments, { maxSeconds = DEFAULT_MAX_CLIP_SECONDS, hookTitle = 'VIRAL SHORT' } = {}) {
+const EMPHASIS_WORDS = new Set([
+    'nunca', 'sempre', 'segredo', 'secreto', 'verdade', 'agora', 'dinheiro', 'grátis', 'erro', 'pare',
+    'ninguém', 'todos', 'milhões', 'mil', 'rápido', 'simples', 'importante', 'cuidado', 'tudo', 'muda',
+]);
+
+function isEmphasisWord(word) {
+    const clean = word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+    return EMPHASIS_WORDS.has(clean) || /[!?]/.test(word) || /\d/.test(word) || clean.length >= 9;
+}
+
+function escapeAssText(text) {
+    return String(text).replace(/[{}]/g, '').replace(/\\/g, '');
+}
+
+/**
+ * Converte um segmento em palavras com tempo. Usa `segment.words` (timestamps reais do Whisper) quando existir;
+ * caso contrário, distribui o tempo do segmento proporcionalmente ao tamanho de cada palavra.
+ */
+export function toTimedWords(segment) {
+    if (Array.isArray(segment.words) && segment.words.length) {
+        return segment.words
+            .map((w) => ({ word: String(w.word ?? w.text ?? '').trim(), start: Number(w.start), end: Number(w.end) }))
+            .filter((w) => w.word && Number.isFinite(w.start) && Number.isFinite(w.end) && w.end > w.start);
+    }
+
+    const words = segment.text.split(/\s+/).filter(Boolean);
+    const weights = words.map((w) => Math.max(2, w.length));
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+    let cursor = segment.start;
+    return words.map((word, i) => {
+        const span = (segment.duration * weights[i]) / totalWeight;
+        const item = { word, start: cursor, end: cursor + span };
+        cursor += span;
+        return item;
+    });
+}
+
+/**
+ * Gera legendas .ass estilo TikTok: blocos de 2–3 palavras, animação "pop", palavra de ênfase em rosa #FF1493
+ * e tarja de gancho fixa no topo. Tempos são deslocados para a linha do tempo do corte (clipStart → 0).
+ */
+export function buildAssSubtitle(segments, {
+    maxSeconds = DEFAULT_MAX_CLIP_SECONDS,
+    hookTitle = 'VIRAL SHORT',
+    clipStart = 0,
+    hookHeadline = null,
+    wordsPerChunk = 3,
+} = {}) {
     const normalized = segments
         .map((segment, index) => normalizeSegment(segment, index))
         .filter(Boolean)
-        .slice(0, 100)
+        .slice(0, 200)
         .sort((a, b) => a.start - b.start);
 
     const header = `[Script Info]
-Title: ${hookTitle}
+Title: ${escapeAssText(hookTitle)}
 ScriptType: v4.00+
 WrapStyle: 0
 ScaledBorderAndShadow: yes
-YCbCr Matrix: None
+YCbCr Matrix: TV.709
 PlayResX: 1080
 PlayResY: 1920
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: ViralHormozi,Bricolage Grotesque,52,&H00FFFFFF,&H009314FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,2,2,40,40,320,1
-Style: HookBanner,Bricolage Grotesque,48,&H009314FF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,2,8,30,30,160,1
+Style: ViralHormozi,Montserrat Black,88,&H00FFFFFF,&H009314FF,&H00000000,&H96000000,-1,0,0,0,100,100,1,0,1,7,3,2,60,60,560,1
+Style: HookBanner,Montserrat Black,62,&H00FFFFFF,&H00FFFFFF,&H009314FF,&H009314FF,-1,0,0,0,100,100,1,0,3,18,0,8,70,70,190,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
-    if (!normalized.length) return header;
+    const events = [];
+    const clipEnd = clipStart + maxSeconds;
 
-    const events = normalized.map((segment) => {
-        const start = Math.min(segment.start, maxSeconds);
-        const end = Math.min(segment.end, maxSeconds + 1);
+    if (hookHeadline) {
+        const headline = escapeAssText(hookHeadline).toUpperCase().slice(0, 60);
+        events.push(`Dialogue: 1,${formatAssTimestamp(0)},${formatAssTimestamp(maxSeconds)},HookBanner,,0,0,0,,{\\fad(150,0)}${headline}`);
+    }
 
-        // Destaca palavras-chave com a cor rosa choque Deep Pink (&H009314FF em BGR hex)
-        const words = segment.text.split(' ').map((word) => {
-            const clean = word.toLowerCase();
-            if (clean.length > 5 || clean.includes('!') || clean.includes('?')) {
-                return `{\\c&H009314FF&}${word}{\\c&H00FFFFFF&}`;
-            }
-            return word;
-        });
+    for (const segment of normalized) {
+        if (segment.end <= clipStart || segment.start >= clipEnd) continue;
 
-        const textFormatted = words.join(' ');
-        return `Dialogue: 0,${formatAssTimestamp(start)},${formatAssTimestamp(end)},ViralHormozi,,0,0,0,,${textFormatted}`;
-    });
+        const timed = toTimedWords(segment).filter((w) => w.end > clipStart && w.start < clipEnd);
+        for (let i = 0; i < timed.length; i += wordsPerChunk) {
+            const chunk = timed.slice(i, i + wordsPerChunk);
+            const start = Math.max(0, chunk[0].start - clipStart);
+            const end = Math.min(maxSeconds, chunk[chunk.length - 1].end - clipStart);
+            if (end <= start) continue;
 
-    return header + events.join('\n');
+            const text = chunk
+                .map(({ word }) => {
+                    const safe = escapeAssText(word).toUpperCase();
+                    return isEmphasisWord(word) ? `{\\c&H009314FF&}${safe}{\\c&H00FFFFFF&}` : safe;
+                })
+                .join(' ');
+
+            // Pop: entra a 80%, estoura para 108% e assenta em 100%
+            const pop = '{\\fscx80\\fscy80\\t(0,90,\\fscx108\\fscy108)\\t(90,160,\\fscx100\\fscy100)}';
+            events.push(`Dialogue: 0,${formatAssTimestamp(start)},${formatAssTimestamp(end)},ViralHormozi,,0,0,0,,${pop}${text}`);
+        }
+    }
+
+    return header + events.join('\n') + '\n';
 }
 
-export function buildSubtitle(segments, maxSeconds = DEFAULT_MAX_CLIP_SECONDS) {
+export function buildSubtitle(segments, maxSeconds = DEFAULT_MAX_CLIP_SECONDS, clipStart = 0) {
+    const clipEnd = clipStart + maxSeconds;
     const normalized = segments
         .map((segment, index) => normalizeSegment(segment, index))
         .filter(Boolean)
-        .slice(0, 100)
+        .filter((segment) => segment.end > clipStart && segment.start < clipEnd)
+        .slice(0, 200)
         .sort((a, b) => a.start - b.start);
 
     if (!normalized.length) return '';
 
     const lines = normalized.map((segment, index) => {
-        const start = Math.min(segment.start, maxSeconds);
-        const end = Math.min(segment.end, maxSeconds + 1);
+        const start = Math.max(0, segment.start - clipStart);
+        const end = Math.min(maxSeconds, segment.end - clipStart);
         return [
             String(index + 1),
             `${formatTimestamp(start)} --> ${formatTimestamp(end)}`,
@@ -347,9 +447,10 @@ ${transcript}`,
  * @param {string} params.outputPath
  * @param {Array<any>} params.transcriptSegments
  * @param {number} [params.maxSeconds]
- * @param {string|null} [params.subtitlePath]
+ * @param {string|null} [params.subtitlePath] .ass a ser queimado (relativo ao cwd do FFmpeg)
  * @param {string|null} [params.hookHeadline]
  * @param {boolean} [params.normalizeAudio]
+ * @param {boolean} [params.useNvenc]
  */
 export function createClip({
     inputPath,
@@ -359,11 +460,12 @@ export function createClip({
     subtitlePath = null,
     hookHeadline = null,
     normalizeAudio = false,
+    useNvenc = true,
 }) {
     const plan = selectBestClip(transcriptSegments, maxSeconds);
     const resolvedHookHeadline = hookHeadline || plan.title;
 
-    const cmd = buildFfmpegCommand({
+    const ffmpegParams = {
         inputPath,
         outputPath,
         start: plan.start,
@@ -371,36 +473,53 @@ export function createClip({
         subtitlePath,
         hookHeadline: resolvedHookHeadline,
         normalizeAudio,
-    });
-
-    const subtitle = buildSubtitle(transcriptSegments, maxSeconds);
-    const assSubtitle = buildAssSubtitle(transcriptSegments, { maxSeconds, hookTitle: plan.title });
-
-    const result = {
-        ...plan,
-        subtitle,
-        assSubtitle,
-        ffmpegCommand: cmd,
+        useNvenc,
     };
 
-    return result;
+    // Legendas na linha do tempo do CORTE (o trecho começa em plan.start no vídeo original)
+    const subtitle = buildSubtitle(transcriptSegments, plan.duration, plan.start);
+    const assSubtitle = buildAssSubtitle(transcriptSegments, {
+        maxSeconds: plan.duration,
+        clipStart: plan.start,
+        hookTitle: plan.title,
+        hookHeadline: resolvedHookHeadline,
+    });
+
+    return {
+        ...plan,
+        hookHeadline: resolvedHookHeadline,
+        subtitle,
+        assSubtitle,
+        ffmpegArgs: buildFfmpegArgs(ffmpegParams),
+        ffmpegCommand: buildFfmpegCommand(ffmpegParams),
+    };
 }
 
-
-export function runClipPipeline({ inputPath, outputPath, transcriptSegments, maxSeconds = DEFAULT_MAX_CLIP_SECONDS }) {
-    const plan = createClip({ inputPath, outputPath, transcriptSegments, maxSeconds });
-    const ffmpegPath = resolveFfmpegBinary();
-    const ffmpegArgs = plan.ffmpegCommand.split(' ').slice(1);
-    const ffmpeg = spawnSync(ffmpegPath, ffmpegArgs, {
-        stdio: 'inherit',
+/**
+ * Executa o FFmpeg com os args do plano. Rodar com `cwd` = pasta de saída permite passar o .ass por nome
+ * de arquivo, evitando o escape de "C:" no filtro ass do Windows.
+ * @param {{ ffmpegArgs: string[] }} plan
+ * @param {{ cwd?: string }} [options]
+ */
+export function renderClip(plan, { cwd } = {}) {
+    const ffmpeg = spawnSync(resolveFfmpegBinary(), plan.ffmpegArgs, {
+        cwd,
         shell: false,
+        encoding: 'utf8',
+        maxBuffer: 32 * 1024 * 1024,
     });
 
     if (ffmpeg.status !== 0) {
-        throw new Error(`FFmpeg failed with status ${ffmpeg.status}`);
+        const tail = String(ffmpeg.stderr || ffmpeg.error?.message || '').split('\n').slice(-12).join('\n');
+        throw new Error(`FFmpeg falhou (status ${ffmpeg.status}):\n${tail}`);
     }
 
     return plan;
+}
+
+export function runClipPipeline({ inputPath, outputPath, transcriptSegments, maxSeconds = DEFAULT_MAX_CLIP_SECONDS }) {
+    const plan = createClip({ inputPath, outputPath, transcriptSegments, maxSeconds });
+    return renderClip(plan);
 }
 
 if (process.argv[1] && process.argv[1].endsWith('viral-short-pipeline.js')) {

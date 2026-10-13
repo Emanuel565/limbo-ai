@@ -135,6 +135,7 @@ export default function ShortsPipelinePanel() {
             formData.append("transcript", transcript);
             formData.append("hookHeadline", hookHeadline);
             formData.append("normalizeAudio", String(normalizeAudio));
+            formData.append("burnSubtitles", String(assSubtitles));
 
             const response = await fetch("/api/shorts-upload", {
                 method: "POST",

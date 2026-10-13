@@ -307,7 +307,7 @@ export default function SocialPublishPanel() {
                                                 className="w-full py-2.5 rounded-full bg-[#FF1493] hover:bg-[#FF1493]/90 text-white font-heading font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition shadow-lg shadow-[#FF1493]/30"
                                             >
                                                 <Zap className="w-3.5 h-3.5" />
-                                                {simulatedPost ? "✓ Publicado com Sucesso via TikTok API v2!" : "Simular Postagem no TikTok (API v2)"}
+                                                {simulatedPost ? "✓ Simulação concluída (nada foi enviado ao TikTok)" : "Simular Postagem (modo teste, sem envio real)"}
                                             </button>
                                         </div>
                                     )}

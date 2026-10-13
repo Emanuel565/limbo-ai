@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 
 import {
     selectBestClip,
+    buildFfmpegArgs,
     buildFfmpegCommand,
     buildSubtitle,
     buildAssSubtitle,
     formatAssTimestamp,
+    toTimedWords,
 } from './viral-short-pipeline.js';
 
 test('selectBestClip chooses the strongest segment under 60 seconds', () => {
@@ -25,34 +27,44 @@ test('selectBestClip chooses the strongest segment under 60 seconds', () => {
     assert.ok(result.title.length > 0);
 });
 
-test('buildFfmpegCommand includes crop, NVENC, and optional loudnorm / headlines', () => {
-    const baseCommand = buildFfmpegCommand({
-        inputPath: 'video.mp4',
-        outputPath: 'clip.mp4',
-        start: 18,
-        duration: 42,
-    });
+test('buildFfmpegArgs includes crop, NVENC, faststart and progress bar', () => {
+    const args = buildFfmpegArgs({ inputPath: 'video.mp4', outputPath: 'clip.mp4', start: 18, duration: 42 });
+    const joined = args.join(' ');
 
-    assert.ok(baseCommand.includes('-ss'));
-    assert.ok(baseCommand.includes('scale=1080:1920'));
-    assert.ok(baseCommand.includes('-t'));
-    assert.ok(baseCommand.includes('clip.mp4'));
-    assert.ok(baseCommand.includes('h264_nvenc'));
+    assert.ok(args.includes('-ss'));
+    assert.ok(joined.includes('scale=1080:1920'));
+    assert.ok(args.includes('h264_nvenc'));
+    assert.ok(args.includes('+faststart'));
+    assert.ok(joined.includes('0xFF1493'));
+    assert.equal(args.at(-1), 'clip.mp4');
+});
 
-    const fullEditCommand = buildFfmpegCommand({
-        inputPath: 'video.mp4',
-        outputPath: 'viral-full.mp4',
+test('buildFfmpegArgs keeps headlines and paths with spaces as single args (regression)', () => {
+    const args = buildFfmpegArgs({
+        inputPath: 'meu video.mp4',
+        outputPath: 'saida final.mp4',
         start: 0,
         duration: 30,
         hookHeadline: 'O SEGREDO DA IA EM 2026',
-        subtitlePath: 'subs.ass',
         normalizeAudio: true,
     });
 
-    assert.ok(fullEditCommand.includes('drawbox=y=140'));
-    assert.ok(fullEditCommand.includes('drawtext=text='));
-    assert.ok(fullEditCommand.includes("subtitles='subs.ass'"));
-    assert.ok(fullEditCommand.includes('loudnorm=I=-14'));
+    assert.ok(args.includes('meu video.mp4'));
+    assert.equal(args.at(-1), 'saida final.mp4');
+    const vf = args[args.indexOf('-vf') + 1];
+    assert.ok(vf.includes("drawtext=text='O SEGREDO DA IA EM 2026'"));
+    assert.ok(args.join(' ').includes('loudnorm=I=-14'));
+});
+
+test('buildFfmpegArgs burns the .ass and skips drawtext when subtitles exist', () => {
+    const args = buildFfmpegArgs({
+        inputPath: 'v.mp4', outputPath: 'o.mp4', start: 0, duration: 10,
+        hookHeadline: 'GANCHO', subtitlePath: 'subs.ass',
+    });
+    const vf = args[args.indexOf('-vf') + 1];
+    assert.ok(vf.includes("ass='subs.ass'"));
+    assert.ok(!vf.includes('drawtext'));
+    assert.ok(buildFfmpegCommand({ inputPath: 'v.mp4', outputPath: 'o.mp4', start: 0, duration: 10 }).startsWith('ffmpeg '));
 });
 
 test('buildSubtitle converts transcript to SRT format', () => {
@@ -65,19 +77,42 @@ test('buildSubtitle converts transcript to SRT format', () => {
     assert.match(subtitle, /Tudo bem\?/);
 });
 
-test('buildAssSubtitle generates styled ASS with Deep Pink keyword highlights', () => {
+test('subtitles are shifted to the clip timeline (regression)', () => {
+    const segments = [
+        { start: 0, end: 5, text: 'Fora do corte' },
+        { start: 20, end: 24, text: 'Dentro do corte agora' },
+    ];
+    const srt = buildSubtitle(segments, 30, 20);
+    assert.ok(!srt.includes('Fora do corte'));
+    assert.match(srt, /00:00:00,000 --> 00:00:04,000/);
+
+    const ass = buildAssSubtitle(segments, { maxSeconds: 30, clipStart: 20 });
+    assert.ok(!ass.includes('FORA'));
+    assert.ok(ass.includes('Dialogue: 0,0:00:00.00'));
+});
+
+test('buildAssSubtitle generates TikTok-style pop chunks with Deep Pink emphasis and hook banner', () => {
     const ass = buildAssSubtitle([
         { start: 0, end: 2.5, text: 'Você precisa ver isso AGORA!' },
         { start: 2.5, end: 6.0, text: 'Essa revelação surpreendente muda tudo.' },
-    ], { maxSeconds: 60, hookTitle: 'GANCHO VIRAL' });
+    ], { maxSeconds: 60, hookTitle: 'GANCHO VIRAL', hookHeadline: 'Gancho viral' });
 
-    assert.ok(ass.includes('[Script Info]'));
     assert.ok(ass.includes('PlayResX: 1080'));
     assert.ok(ass.includes('PlayResY: 1920'));
     assert.ok(ass.includes('Style: ViralHormozi'));
-    assert.ok(ass.includes('Dialogue: 0,0:00:00.00,0:00:02.50'));
-    // Contém a cor BGR do Deep Pink #FF1493 (&H009314FF) destacando a palavra com exclamação
-    assert.ok(ass.includes('&H009314FF&'));
+    assert.ok(ass.includes('HookBanner,,0,0,0,,{\\fad(150,0)}GANCHO VIRAL'));
+    assert.ok(ass.includes('\\t(0,90,\\fscx108\\fscy108)'));
+    assert.ok(ass.includes('&H009314FF&}AGORA!'));
+    // 5 palavras em blocos de 3 → 2 eventos no primeiro segmento
+    const firstSegmentEvents = ass.split('\n').filter((l) => l.startsWith('Dialogue: 0,0:00:0') && /0:00:0[0-2]\./.test(l.split(',')[2]));
+    assert.ok(firstSegmentEvents.length >= 2);
+});
+
+test('toTimedWords prefers real Whisper word timestamps', () => {
+    const words = toTimedWords({ start: 0, end: 2, duration: 2, text: 'oi mundo', words: [
+        { word: 'oi', start: 0.1, end: 0.4 }, { word: 'mundo', start: 0.5, end: 1.2 },
+    ] });
+    assert.deepEqual(words.map((w) => w.start), [0.1, 0.5]);
 });
 
 test('formatAssTimestamp formats accurately for ASS centiseconds', () => {
