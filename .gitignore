@@ -44,4 +44,5 @@ next-env.d.ts
 # generated media
 /public/generated/
 .continue/
+/data/*.json
 

@@ -20,7 +20,31 @@ import {
     KeyRound,
     ExternalLink,
     Lock,
+    Trash2,
+    Calendar,
+    RefreshCw,
+    AlertCircle,
 } from "lucide-react";
+
+interface ScheduledJob {
+    id: string;
+    title: string;
+    description: string;
+    videoUrl: string;
+    videoPath?: string;
+    platforms: string[];
+    scheduledFor: string;
+    timeLabel: string;
+    deleteAfterPublish: boolean;
+    status: "SCHEDULED" | "PUBLISHING" | "PUBLISHED" | "FAILED" | "CANCELLED";
+    createdAt: string;
+    publishedAt?: string;
+    cancelledAt?: string;
+    result?: Record<string, unknown>;
+    deletedFiles?: string[];
+    storageFreed?: boolean;
+    error?: string;
+}
 
 const defaultDescription = `🔥 Clutch insano no competitivo de Valorant!
 📌 1 HP no relógio, spike plantado e mira calibrada na cabeça.
@@ -117,7 +141,7 @@ export default function SocialPublishPanel() {
     const [description, setDescription] = useState(defaultDescription);
     const [videoUrl, setVideoUrl] = useState("/generated/short-viral.mp4");
     const [platform, setPlatform] = useState("all");
-    const [activeTab, setActiveTab] = useState<"tiktok" | "instagram" | "youtube" | "analytics">("tiktok");
+    const [activeTab, setActiveTab] = useState<"tiktok" | "instagram" | "youtube" | "analytics" | "queue">("tiktok");
     const [copied, setCopied] = useState(false);
     const [result, setResult] = useState<PublishResult | null>(null);
     const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
@@ -125,6 +149,19 @@ export default function SocialPublishPanel() {
     const [analyzing, setAnalyzing] = useState(false);
     const [publishingApi, setPublishingApi] = useState(false);
     const [error, setError] = useState("");
+
+    // Fila de Agendamento Automático (Horários Nobres & Auto-Exclusão SSD)
+    const [queueList, setQueueList] = useState<ScheduledJob[]>([]);
+    const [queueNextSlot, setQueueNextSlot] = useState<{
+        scheduledFor: string;
+        timeString: string;
+        dayLabel: string;
+        reason: string;
+    } | null>(null);
+    const [loadingQueue, setLoadingQueue] = useState(false);
+    const [cancellingId, setCancellingId] = useState<string | null>(null);
+    const [schedulingCurrent, setSchedulingCurrent] = useState(false);
+    const [deleteAfterSchedule, setDeleteAfterSchedule] = useState(true);
 
     // Credenciais Modal / Painel
     const [showCredsModal, setShowCredsModal] = useState(false);
@@ -228,7 +265,75 @@ export default function SocialPublishPanel() {
                 }
             })
             .catch(() => {});
+
+        fetchQueue();
     }, []);
+
+    // Carrega a fila de agendamento e o próximo horário nobre
+    async function fetchQueue() {
+        setLoadingQueue(true);
+        try {
+            const res = await fetch("/api/schedule");
+            const data = await res.json();
+            if (data.ok) {
+                setQueueList(data.queue || []);
+                setQueueNextSlot(data.nextOptimalSlot || null);
+            }
+        } catch (err) {
+            console.error("Falha ao carregar fila:", err);
+        } finally {
+            setLoadingQueue(false);
+        }
+    }
+
+    // Cancela post agendado
+    async function handleCancelScheduled(id: string) {
+        setCancellingId(id);
+        try {
+            const res = await fetch(`/api/schedule?id=${encodeURIComponent(id)}`, {
+                method: "DELETE",
+            });
+            const data = await res.json();
+            if (data.ok) {
+                await fetchQueue();
+            }
+        } catch (err) {
+            console.error("Falha ao cancelar agendamento:", err);
+        } finally {
+            setCancellingId(null);
+        }
+    }
+
+    // Agenda o corte atual para o melhor horário nobre
+    async function handleScheduleFromPanel() {
+        setSchedulingCurrent(true);
+        setError("");
+        try {
+            const res = await fetch("/api/schedule", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title,
+                    description,
+                    videoUrl,
+                    platforms: platform === "all" || platform === "both" ? ["tiktok", "instagram"] : [platform],
+                    useNextOptimal: true,
+                    deleteAfterPublish: deleteAfterSchedule,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || "Erro ao agendar publicação.");
+            }
+            await fetchQueue();
+            setActiveTab("queue");
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Falha no agendamento.";
+            setError(message);
+        } finally {
+            setSchedulingCurrent(false);
+        }
+    }
 
     // Ouve eventos quando um corte for gerado no ShortsPipelinePanel
     useEffect(() => {
@@ -781,6 +886,33 @@ export default function SocialPublishPanel() {
                                 <Zap className="h-4 w-4" />
                                 {publishingApi ? "Publicando via API..." : "Publicar via API"}
                             </button>
+
+                            <button
+                                type="button"
+                                onClick={handleScheduleFromPanel}
+                                disabled={schedulingCurrent}
+                                className="rounded-full bg-black/60 hover:bg-black/90 border border-[#FF1493]/60 text-pink-300 font-heading uppercase tracking-wider text-xs px-5 py-3 font-bold transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                                title="Agenda o vídeo para o melhor horário e exclui o arquivo local após o envio"
+                            >
+                                <Clock className="h-4 w-4 text-[#FF1493]" />
+                                {schedulingCurrent ? "Agendando..." : `Agendar Pico (${queueNextSlot ? queueNextSlot.timeString : "11:30"})`}
+                            </button>
+                        </div>
+
+                        {/* Toggle de Auto-Exclusão do Arquivo */}
+                        <div className="mt-3 pt-3 border-t border-white/5">
+                            <label className="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={deleteAfterSchedule}
+                                    onChange={(e) => setDeleteAfterSchedule(e.target.checked)}
+                                    className="accent-[#FF1493] w-3.5 h-3.5 rounded"
+                                />
+                                <span className="flex items-center gap-1.5">
+                                    <Trash2 className="w-3.5 h-3.5 text-[#FF1493]" />
+                                    Excluir vídeo do computador após postar (Economiza espaço no SSD)
+                                </span>
+                            </label>
                         </div>
 
                         {error && (
@@ -834,6 +966,26 @@ export default function SocialPublishPanel() {
                                     }`}
                                 >
                                     Análise de Contas
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setActiveTab("queue");
+                                        fetchQueue();
+                                    }}
+                                    className={`px-3 py-1 rounded-full text-[11px] font-heading uppercase tracking-wider transition flex items-center gap-1.5 ${
+                                        activeTab === "queue"
+                                            ? "bg-emerald-600 text-white font-bold"
+                                            : "bg-white/5 text-slate-300 hover:text-white"
+                                    }`}
+                                >
+                                    <Clock className="w-3 h-3 text-emerald-300" />
+                                    <span>Fila Agendada</span>
+                                    {queueList.filter((q) => q.status === "SCHEDULED").length > 0 && (
+                                        <span className="px-1.5 py-0.2 rounded-full bg-emerald-400 text-black text-[9px] font-bold">
+                                            {queueList.filter((q) => q.status === "SCHEDULED").length}
+                                        </span>
+                                    )}
                                 </button>
                             </div>
 
@@ -983,6 +1135,202 @@ export default function SocialPublishPanel() {
                                             </p>
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+                            {/* TAB: Queue (Fila Agendada com Auto-Exclusão SSD) */}
+                            {activeTab === "queue" && (
+                                <div className="space-y-3.5 text-xs">
+                                    {/* Header com Próximo Horário Nobre & Botão de Atualizar */}
+                                    <div className="p-3.5 rounded-2xl bg-black/40 border border-emerald-500/30 space-y-2.5">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-1.5 text-emerald-300 font-heading font-bold uppercase tracking-wider text-[11px]">
+                                                <Clock className="w-3.5 h-3.5" />
+                                                Próxima Janela de Audiência
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={fetchQueue}
+                                                disabled={loadingQueue}
+                                                className="text-[10px] text-slate-300 hover:text-white flex items-center gap-1 font-mono transition cursor-pointer"
+                                                title="Sincronizar fila agora"
+                                            >
+                                                <RefreshCw className={`w-3 h-3 ${loadingQueue ? "animate-spin text-emerald-400" : ""}`} />
+                                                {loadingQueue ? "Checando..." : "Atualizar"}
+                                            </button>
+                                        </div>
+
+                                        {queueNextSlot ? (
+                                            <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-950/40 border border-emerald-500/20">
+                                                <div>
+                                                    <div className="text-white font-heading font-black text-sm">
+                                                        {queueNextSlot.dayLabel} às {queueNextSlot.timeString}
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-300 font-light">
+                                                        {queueNextSlot.reason}
+                                                    </div>
+                                                </div>
+                                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono border border-emerald-500/30">
+                                                    Pico Ativo
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="text-[11px] text-slate-400">
+                                                Carregando horários preditivos de Valorant...
+                                            </div>
+                                        )}
+
+                                        {/* Explicação de Economia de Espaço */}
+                                        <div className="text-[10px] text-pink-300 flex items-start gap-1.5 pt-1 border-t border-white/5">
+                                            <Trash2 className="w-3 h-3 text-[#FF1493] shrink-0 mt-0.5" />
+                                            <span>
+                                                <strong>Auto-Exclusão SSD:</strong> Os vídeos agendados são excluídos automaticamente do computador assim que a publicação for confirmada nas APIs, economizando espaço em disco.
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Grade de Horários Nobres Mapeados */}
+                                    <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-2">
+                                        <span className="text-[10px] font-heading uppercase tracking-wider text-slate-300 font-bold block">
+                                            Melhores Horários Monitorados (Valorant Feed)
+                                        </span>
+                                        <div className="grid grid-cols-3 gap-1.5">
+                                            {[
+                                                { time: "11:30", label: "Almoço TikTok" },
+                                                { time: "12:15", label: "Pausa Reels" },
+                                                { time: "17:15", label: "Fim Expediente" },
+                                                { time: "18:40", label: "Retenção Feed" },
+                                                { time: "20:45", label: "Nobre Gamers" },
+                                                { time: "21:00", label: "Pico Máximo" },
+                                            ].map((slot, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    className="p-1.5 rounded-xl bg-white/5 border border-white/10 text-center"
+                                                >
+                                                    <div className="text-white font-mono font-bold text-[11px]">
+                                                        {slot.time}
+                                                    </div>
+                                                    <div className="text-[9px] text-slate-400 truncate">
+                                                        {slot.label}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Lista de Itens na Fila */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between text-[11px] font-heading uppercase tracking-wider text-white font-bold px-1">
+                                            <span>Postagens Agendadas ({queueList.length})</span>
+                                        </div>
+
+                                        {queueList.length === 0 ? (
+                                            <div className="p-6 rounded-2xl border border-dashed border-white/10 bg-black/20 text-center">
+                                                <Calendar className="w-6 h-6 text-emerald-400/50 mx-auto mb-2" />
+                                                <p className="text-slate-300 text-xs">
+                                                    Nenhum vídeo na fila de agendamento.
+                                                </p>
+                                                <p className="text-[10px] text-slate-400 mt-1">
+                                                    Gere um corte ou clique em <strong>&ldquo;Agendar Pico&rdquo;</strong> para enfileirar.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                                                {queueList.map((job) => (
+                                                    <div
+                                                        key={job.id}
+                                                        className={`p-3 rounded-2xl border transition ${
+                                                            job.status === "SCHEDULED"
+                                                                ? "bg-amber-950/20 border-amber-500/30"
+                                                                : job.status === "PUBLISHED"
+                                                                ? "bg-emerald-950/20 border-emerald-500/30"
+                                                                : job.status === "FAILED"
+                                                                ? "bg-rose-950/20 border-rose-500/30"
+                                                                : "bg-black/30 border-white/10"
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2 mb-1">
+                                                            <div className="flex-1">
+                                                                <h5 className="font-heading font-bold text-white text-xs line-clamp-1">
+                                                                    {job.title}
+                                                                </h5>
+                                                                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono mt-0.5">
+                                                                    <span>⏰ {new Date(job.scheduledFor).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} às {job.timeLabel}</span>
+                                                                    <span>•</span>
+                                                                    <span>{job.platforms.join(" + ").toUpperCase()}</span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Status Badge */}
+                                                            <div>
+                                                                {job.status === "SCHEDULED" && (
+                                                                    <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono border border-amber-500/30">
+                                                                        Agendado
+                                                                    </span>
+                                                                )}
+                                                                {job.status === "PUBLISHING" && (
+                                                                    <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-mono animate-pulse border border-purple-500/30">
+                                                                        Postando...
+                                                                    </span>
+                                                                )}
+                                                                {job.status === "PUBLISHED" && (
+                                                                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono border border-emerald-500/30">
+                                                                        Publicado
+                                                                    </span>
+                                                                )}
+                                                                {job.status === "FAILED" && (
+                                                                    <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px] font-mono border border-rose-500/30">
+                                                                        Falhou
+                                                                    </span>
+                                                                )}
+                                                                {job.status === "CANCELLED" && (
+                                                                    <span className="px-2 py-0.5 rounded-full bg-slate-500/20 text-slate-400 text-[10px] font-mono border border-slate-500/30">
+                                                                        Cancelado
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Status de Exclusão SSD */}
+                                                        <div className="flex items-center justify-between pt-1.5 border-t border-white/5 text-[10px]">
+                                                            {job.deleteAfterPublish ? (
+                                                                job.status === "PUBLISHED" && job.deletedFiles && job.deletedFiles.length > 0 ? (
+                                                                    <span className="text-emerald-400 font-mono flex items-center gap-1">
+                                                                        <Trash2 className="w-3 h-3" /> Excluído do SSD ({job.deletedFiles.length} arquivos)
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-pink-300 font-mono flex items-center gap-1">
+                                                                        <Trash2 className="w-3 h-3 text-[#FF1493]" /> Exclusão do SSD ao postar
+                                                                    </span>
+                                                                )
+                                                            ) : (
+                                                                <span className="text-slate-400 font-mono">
+                                                                    Salvo no SSD
+                                                                </span>
+                                                            )}
+
+                                                            {job.status === "SCHEDULED" && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleCancelScheduled(job.id)}
+                                                                    disabled={cancellingId === job.id}
+                                                                    className="text-rose-400 hover:text-rose-300 font-semibold cursor-pointer transition text-[10px]"
+                                                                >
+                                                                    {cancellingId === job.id ? "Cancelando..." : "Cancelar"}
+                                                                </button>
+                                                            )}
+                                                        </div>
+
+                                                        {job.error && (
+                                                            <div className="mt-1 text-[10px] text-rose-300 font-mono">
+                                                                Erro: {job.error}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>

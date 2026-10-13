@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { Play, Sparkles, TestTube, Film, Cpu, CheckCircle2, Scissors, Send, Flame, Target, Crosshair, ArrowRight, ExternalLink } from "lucide-react";
+import { Play, Sparkles, TestTube, Film, Cpu, CheckCircle2, Scissors, Send, Flame, Target, Crosshair, ArrowRight, ExternalLink, Clock, Trash2 } from "lucide-react";
 
 interface ShortPlan {
     title: string;
@@ -71,11 +71,27 @@ export default function ShortsPipelinePanel() {
     const [generated, setGenerated] = useState<{ mp4Url?: string; subtitleUrl?: string; assSubtitleUrl?: string } | null>(null);
     const [error, setError] = useState("");
 
-    // Publicação de API
+    // Publicação & Agendamento Inteligente
     const [publishPlatform, setPublishPlatform] = useState<"both" | "tiktok" | "instagram">("both");
     const [publishing, setPublishing] = useState(false);
     const [publishResult, setPublishResult] = useState<any>(null);
     const [publishError, setPublishError] = useState("");
+    const [nextOptimalSlot, setNextOptimalSlot] = useState<{ timeString: string; dayLabel: string; reason?: string } | null>(null);
+    const [deleteAfterPublish, setDeleteAfterPublish] = useState(true);
+    const [scheduling, setScheduling] = useState(false);
+    const [scheduleSuccessMsg, setScheduleSuccessMsg] = useState("");
+
+    // Carrega próximo horário nobre para postagem
+    useEffect(() => {
+        fetch("/api/schedule")
+            .then((r) => r.json())
+            .then((data) => {
+                if (data.ok && data.nextOptimalSlot) {
+                    setNextOptimalSlot(data.nextOptimalSlot);
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     // Ouve eventos disparados pelo Trend Hunter
     useEffect(() => {
@@ -254,6 +270,44 @@ export default function ShortsPipelinePanel() {
             setPublishError(message);
         } finally {
             setPublishing(false);
+        }
+    }
+
+    async function handleSchedulePost() {
+        setScheduling(true);
+        setPublishError("");
+        setScheduleSuccessMsg("");
+        setPublishResult(null);
+
+        try {
+            const videoPath = generated?.mp4Url
+                ? `${window.location.origin}${generated.mp4Url}`
+                : `${window.location.origin}/generated/short-viral.mp4`;
+
+            const res = await fetch("/api/schedule", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: hookHeadline,
+                    description: transcript,
+                    videoUrl: videoPath,
+                    platforms: publishPlatform === "both" ? ["tiktok", "instagram"] : [publishPlatform],
+                    useNextOptimal: true,
+                    deleteAfterPublish,
+                }),
+            });
+
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || "Erro ao agendar publicação.");
+            }
+
+            setScheduleSuccessMsg(data.message || "✓ Vídeo agendado com sucesso!");
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Erro ao agendar.";
+            setPublishError(message);
+        } finally {
+            setScheduling(false);
         }
     }
 
@@ -657,16 +711,50 @@ export default function ShortsPipelinePanel() {
                                             </button>
                                         </div>
 
-                                        {/* Publish Button */}
-                                        <button
-                                            type="button"
-                                            onClick={handlePublishToSocial}
-                                            disabled={publishing}
-                                            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#FF1493] to-pink-600 hover:opacity-95 text-white font-heading font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg shadow-[#FF1493]/30"
-                                        >
-                                            <Send className="w-3.5 h-3.5" />
-                                            {publishing ? "Enviando para as APIs Oficiais..." : "Publicar Agora nas Redes (1-Clique)"}
-                                        </button>
+                                        {/* Action Buttons: Publish Now vs Schedule */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={handlePublishToSocial}
+                                                disabled={publishing || scheduling}
+                                                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#FF1493] to-pink-600 hover:opacity-95 text-white font-heading font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg shadow-[#FF1493]/30"
+                                            >
+                                                <Send className="w-3.5 h-3.5" />
+                                                {publishing ? "Enviando..." : "Publicar Agora"}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleSchedulePost}
+                                                disabled={scheduling || publishing}
+                                                className="w-full py-2.5 rounded-xl bg-black/60 hover:bg-black/90 border border-[#FF1493]/60 text-pink-300 font-heading font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                                                title="Agenda a postagem automática para o horário de maior retenção e exclui o arquivo pós-envio"
+                                            >
+                                                <Clock className="w-3.5 h-3.5 text-[#FF1493]" />
+                                                {scheduling ? "Agendando..." : `Agendar (${nextOptimalSlot ? `${nextOptimalSlot.timeString}` : "11:30"})`}
+                                            </button>
+                                        </div>
+
+                                        {/* Toggle de Auto-Exclusão do Arquivo */}
+                                        <label className="flex items-center gap-2 pt-1 text-[11px] text-slate-300 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={deleteAfterPublish}
+                                                onChange={(e) => setDeleteAfterPublish(e.target.checked)}
+                                                className="accent-[#FF1493] w-3.5 h-3.5 rounded"
+                                            />
+                                            <span className="flex items-center gap-1.5">
+                                                <Trash2 className="w-3 h-3 text-[#FF1493]" />
+                                                Excluir vídeo do computador após postar (Economiza espaço no SSD)
+                                            </span>
+                                        </label>
+
+                                        {/* Feedback de Agendamento */}
+                                        {scheduleSuccessMsg && (
+                                            <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-[11px] font-mono flex items-center gap-2">
+                                                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                                <span>{scheduleSuccessMsg}</span>
+                                            </div>
+                                        )}
 
                                         {/* Publish Feedback */}
                                         {publishResult && (
