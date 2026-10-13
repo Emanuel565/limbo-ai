@@ -8,14 +8,15 @@
     "url": "https://github.com/Emanuel565/limbo-ai.git"
   },
   "private": true,
-
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --test tools/viral-short-pipeline.test.js tools/trend-hunter.test.js tools/social-publisher.test.js",
-    "test:shorts": "node --test tools/viral-short-pipeline.test.js tools/trend-hunter.test.js tools/social-publisher.test.js",
+    "test": "node --test tools/viral-short-pipeline.test.js tools/trend-hunter.test.js tools/social-publisher.test.js tools/ghost-engine.test.js tools/valorant-autopilot.test.js tools/gameplay-ai-analyzer.test.js",
+    "test:shorts": "node --test tools/viral-short-pipeline.test.js tools/trend-hunter.test.js tools/social-publisher.test.js tools/ghost-engine.test.js tools/valorant-autopilot.test.js",
+    "test:ghost": "node --test tools/ghost-engine.test.js",
+    "test:valorant": "node --test tools/valorant-autopilot.test.js",
     "shorts:plan": "node tools/viral-short-pipeline.js"
   },
   "dependencies": {
@@ -38,6 +39,9 @@
     "next": "15.2.0-canary.76",
     "next-themes": "^0.4.4",
     "openai": "^4.86.1",
+    "puppeteer": "^25.13.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.0.0",
