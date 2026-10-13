@@ -134,10 +134,38 @@ export default function SocialPublishPanel() {
     const [instagramAccountId, setInstagramAccountId] = useState("");
     const [savingCreds, setSavingCreds] = useState(false);
     const [credsSuccessMsg, setCredsSuccessMsg] = useState("");
+    const [tiktokAuthCode, setTiktokAuthCode] = useState("");
+    const [exchangingCode, setExchangingCode] = useState(false);
     const [credsStatus, setCredsStatus] = useState<{
         tiktok?: { hasToken: boolean; maskedToken: string; username?: string; openId?: string };
         instagram?: { hasToken: boolean; maskedToken: string; username?: string; accountId?: string };
     }>({});
+
+    async function handleExchangeCode() {
+        if (!tiktokAuthCode.trim()) return;
+        setExchangingCode(true);
+        setError("");
+        try {
+            const res = await fetch("/api/auth/tiktok/token", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code: tiktokAuthCode.trim() }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || "Erro ao trocar código por token.");
+            }
+            setCredsSuccessMsg("✓ Token do TikTok gerado e salvo com sucesso em .env.local!");
+            setTiktokAuthCode("");
+            const fresh = await fetch("/api/social-credentials").then((r) => r.json());
+            if (fresh.ok && fresh.credentials) setCredsStatus(fresh.credentials);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Falha na troca de código.";
+            setError(message);
+        } finally {
+            setExchangingCode(false);
+        }
+    }
 
     // Carrega status das credenciais cadastradas
     useEffect(() => {
@@ -377,9 +405,44 @@ export default function SocialPublishPanel() {
                                     )}
                                 </div>
 
+                                <div className="p-3 rounded-xl bg-[#FF1493]/10 border border-[#FF1493]/30 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-heading uppercase tracking-wider text-[#FF1493] font-bold">
+                                            Autorização Rápida (OAuth 2.0)
+                                        </span>
+                                        <span className="text-[9px] text-emerald-400 font-mono">Client Key Ativa</span>
+                                    </div>
+                                    <a
+                                        href={`https://www.tiktok.com/v2/auth/authorize/?client_key=sbawes5f6trrwixg9i&scope=user.info.basic,video.upload,video.publish&response_type=code&redirect_uri=${encodeURIComponent('https://emanuel565.github.io/limbo-ai/')}&state=limbo_ai`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="w-full py-2 px-3 rounded-xl bg-[#FF1493] hover:bg-[#FF1493]/90 text-white text-[11px] font-heading font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition shadow-md shadow-[#FF1493]/30 cursor-pointer"
+                                    >
+                                        <Zap className="w-3.5 h-3.5" />
+                                        1. Conectar Conta do TikTok
+                                    </a>
+                                    <div className="flex gap-2 pt-1">
+                                        <input
+                                            type="text"
+                                            value={tiktokAuthCode}
+                                            onChange={(e) => setTiktokAuthCode(e.target.value)}
+                                            placeholder="Cole o código (code) se necessário"
+                                            className="w-full rounded-xl border border-white/15 bg-black/60 px-3 py-1.5 text-[10px] text-white font-mono outline-none focus:border-[#FF1493]"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleExchangeCode}
+                                            disabled={exchangingCode || !tiktokAuthCode}
+                                            className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[10px] font-heading uppercase font-bold transition disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                                        >
+                                            {exchangingCode ? "Gerando..." : "Gerar Token"}
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <div>
                                     <label className="block text-[11px] text-slate-300 font-semibold mb-1">
-                                        TIKTOK_ACCESS_TOKEN
+                                        TIKTOK_ACCESS_TOKEN (Manual ou Automático)
                                     </label>
                                     <input
                                         type="password"
