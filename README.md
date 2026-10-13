@@ -50,14 +50,21 @@ flowchart TD
   - `acompressor`: Nivelamento e punch dinâmico vocal.
   - `loudnorm=I=-14:LRA=7:TP=-1.5`: Normalização profissional no padrão EBU R128 (-14 LUFS).
 
-### 3. 📱 Publicação no TikTok, YouTube Shorts & Instagram Reels
-- **Integração com TikTok:**
-  - Gerador de legendas com hashtags algorítmicas de alto alcance (`#fyp`, `#foryou`, `#viral`, `#tiktokbrasil`).
-  - Geração de payload compatível com a especificação oficial da **TikTok Content Posting API v2**.
-- **Ações Rápidas:**
-  - Cópia instantânea de legendas formatadas para a área de transferência.
-  - Abas dedicadas para pré-visualização de cada rede social (TikTok, Shorts e Reels).
-  - Download imediato dos arquivos finais (`.mp4`, `.srt` e `.ass`).
+### 3. 📱 Conexão de Contas, Análise e Publicação via API (TikTok & Instagram Reels)
+- **Gerenciador de Contas Sociais:**
+  - Suporte a contas vinculadas do **TikTok** (`@seu_tiktok`) e **Instagram** (`@seu_instagram`).
+  - **Nova Função de Análise Preditiva & Auditoria de Algoritmo:**
+    - Diagnóstico de **Score de Viralidade** (0-100) para cada rede.
+    - Identificação dos **Melhores Horários para Postar** (ex: 11:30h, 17:15h e 20:45h) com base nos picos de engajamento.
+    - Recomendações em tempo real da IA para otimização de retenção nos primeiros 3 segundos.
+- **Publicação Direta por Meio de API:**
+  - **Meta Graph API v19.0 (Instagram Reels):**
+    - Criação de contêiner de mídia 9:16 (`POST /{ig-user-id}/media`), polling de processamento e publicação automatizada (`POST /{ig-user-id}/media_publish`).
+  - **TikTok Content Posting API v2:**
+    - Postagem direta de vídeos com tags algorítmicas (`POST /v2/post/publish/video/init/`), controle de privacidade, dueto e comentários.
+  - **Disparo com 1 Clique:**
+    - O vídeo renderizado no motor vertical é transmitido diretamente para a publicação social com geração instantânea de legendas e tags (#fyp, #viral, #reels).
+
 
 ---
 
@@ -105,6 +112,15 @@ YOUTUBE_API_KEY=sua_chave_do_google_cloud
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=llama3.1:8b
 OLLAMA_FALLBACK_MODEL=qwen2.5-coder:7b
+
+# TikTok Content Posting API v2 (Opcional para postagem real)
+TIKTOK_ACCESS_TOKEN=seu_token_de_acesso_tiktok
+TIKTOK_CREATOR_USERNAME=@seu_tiktok
+
+# Meta Graph API v19.0 (Instagram Reels - Opcional para postagem real)
+INSTAGRAM_ACCESS_TOKEN=seu_token_graph_api
+INSTAGRAM_BUSINESS_ACCOUNT_ID=seu_instagram_account_id
+INSTAGRAM_USERNAME=@seu_instagram
 ```
 
 ### Executando o Projeto

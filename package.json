@@ -14,7 +14,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:shorts": "node --test tools/viral-short-pipeline.test.js",
+    "test": "node --test tools/viral-short-pipeline.test.js tools/trend-hunter.test.js tools/social-publisher.test.js",
+    "test:shorts": "node --test tools/viral-short-pipeline.test.js tools/trend-hunter.test.js tools/social-publisher.test.js",
     "shorts:plan": "node tools/viral-short-pipeline.js"
   },
   "dependencies": {

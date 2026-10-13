@@ -161,6 +161,14 @@ export default function ShortsPipelinePanel() {
             });
             setPlan(data.plan);
             setError("");
+
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(
+                    new CustomEvent("short-generated", {
+                        detail: { mp4Url: data.mp4Url, title: data.plan?.title || hookHeadline },
+                    })
+                );
+            }
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : "Erro ao processar o vídeo.";
             setError(message);
