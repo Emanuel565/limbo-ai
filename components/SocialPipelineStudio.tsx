@@ -601,22 +601,22 @@ export default function SocialPipelineStudio() {
         <button
           type="button"
           onClick={() => setCurrentStep(1)}
-          className={`p-4 sm:p-5 rounded-3xl text-left transition-all duration-300 cursor-pointer ${
+          className={`flex flex-col items-start justify-between w-full p-4 sm:p-5 rounded-3xl text-left transition-all duration-300 cursor-pointer ${
             currentStep === 1
-              ? "liquid-btn-pink shadow-[0_16px_36px_-4px_rgba(255,20,147,0.7)] text-white scale-[1.02]"
+              ? "bg-gradient-to-br from-[#FF1493]/90 via-[#f43f5e]/95 to-[#e11d48] border border-white/60 shadow-[0_16px_36px_-4px_rgba(255,20,147,0.7)] text-white scale-[1.02]"
               : "liquid-glass-card text-slate-300 hover:text-white hover:bg-white/10"
           }`}
         >
-          <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center justify-between w-full mb-1.5">
             <span className={`text-[10px] font-heading uppercase font-bold tracking-wider ${currentStep === 1 ? "text-white/90" : "text-[#FF1493]"}`}>
               Passo 01
             </span>
             <Gamepad2 className={`w-4 h-4 ${currentStep === 1 ? "text-white" : "text-[#FF1493]"}`} />
           </div>
-          <div className="text-xs sm:text-sm font-heading font-bold uppercase truncate">
+          <div className="text-xs sm:text-sm font-heading font-bold uppercase truncate w-full">
             Gameplay & Arquétipos
           </div>
-          <p className={`text-[10px] hidden sm:block mt-1 font-light ${currentStep === 1 ? "text-white/80" : "text-slate-400"}`}>
+          <p className={`text-[10px] hidden sm:block mt-1 font-light w-full ${currentStep === 1 ? "text-white/80" : "text-slate-400"}`}>
             Clutch 1v5, Lineup, Mira do Aspas
           </p>
         </button>
@@ -624,22 +624,22 @@ export default function SocialPipelineStudio() {
         <button
           type="button"
           onClick={() => setCurrentStep(2)}
-          className={`p-4 sm:p-5 rounded-3xl text-left transition-all duration-300 cursor-pointer ${
+          className={`flex flex-col items-start justify-between w-full p-4 sm:p-5 rounded-3xl text-left transition-all duration-300 cursor-pointer ${
             currentStep === 2
-              ? "liquid-btn-primary shadow-[0_16px_36px_-4px_rgba(139,92,246,0.7)] text-white scale-[1.02]"
+              ? "bg-gradient-to-br from-[#8b5cf6]/90 via-[#7c3aed]/95 to-[#6366f1] border border-white/60 shadow-[0_16px_36px_-4px_rgba(139,92,246,0.7)] text-white scale-[1.02]"
               : "liquid-glass-card text-slate-300 hover:text-white hover:bg-white/10"
           }`}
         >
-          <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center justify-between w-full mb-1.5">
             <span className={`text-[10px] font-heading uppercase font-bold tracking-wider ${currentStep === 2 ? "text-white/90" : "text-purple-400"}`}>
               Passo 02
             </span>
-            <Scissors className={`w-4 h-4 ${currentStep === 2 ? "text-white" : "text-purple-400]"}`} />
+            <Scissors className={`w-4 h-4 ${currentStep === 2 ? "text-white" : "text-purple-400"}`} />
           </div>
-          <div className="text-xs sm:text-sm font-heading font-bold uppercase truncate">
+          <div className="text-xs sm:text-sm font-heading font-bold uppercase truncate w-full">
             Edição 9:16 & NVENC
           </div>
-          <p className={`text-[10px] hidden sm:block mt-1 font-light ${currentStep === 2 ? "text-white/80" : "text-slate-400"}`}>
+          <p className={`text-[10px] hidden sm:block mt-1 font-light w-full ${currentStep === 2 ? "text-white/80" : "text-slate-400"}`}>
             GPU RTX 3060 Ti • Legendas Neon
           </p>
         </button>
@@ -647,22 +647,22 @@ export default function SocialPipelineStudio() {
         <button
           type="button"
           onClick={() => setCurrentStep(3)}
-          className={`p-4 sm:p-5 rounded-3xl text-left transition-all duration-300 cursor-pointer ${
+          className={`flex flex-col items-start justify-between w-full p-4 sm:p-5 rounded-3xl text-left transition-all duration-300 cursor-pointer ${
             currentStep === 3
-              ? "liquid-btn-secondary shadow-[0_16px_36px_-4px_rgba(45,212,191,0.65)] text-white scale-[1.02]"
+              ? "bg-gradient-to-br from-[#2dd4bf]/90 via-[#14b8a6]/95 to-[#06b6d4] border border-white/60 shadow-[0_16px_36px_-4px_rgba(45,212,191,0.65)] text-white scale-[1.02]"
               : "liquid-glass-card text-slate-300 hover:text-white hover:bg-white/10"
           }`}
         >
-          <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center justify-between w-full mb-1.5">
             <span className={`text-[10px] font-heading uppercase font-bold tracking-wider ${currentStep === 3 ? "text-white/90" : "text-emerald-400"}`}>
               Passo 03
             </span>
             <Share2 className={`w-4 h-4 ${currentStep === 3 ? "text-white" : "text-emerald-400"}`} />
           </div>
-          <div className="text-xs sm:text-sm font-heading font-bold uppercase truncate">
+          <div className="text-xs sm:text-sm font-heading font-bold uppercase truncate w-full">
             Fila, Postagens & Lucro
           </div>
-          <p className={`text-[10px] hidden sm:block mt-1 font-light ${currentStep === 3 ? "text-white/80" : "text-slate-400"}`}>
+          <p className={`text-[10px] hidden sm:block mt-1 font-light w-full ${currentStep === 3 ? "text-white/80" : "text-slate-400"}`}>
             TikTok, Reels, Shorts & Ganhos
           </p>
         </button>
@@ -690,10 +690,10 @@ export default function SocialPipelineStudio() {
           {/* ======================================================== */}
           {/* WATCH FOLDER AUTOPILOT: PASTA VIGIADA DE GAMEPLAYS       */}
           {/* ======================================================== */}
-          <div className="liquid-glass-hologram p-6 rounded-3xl space-y-5 border-white/40 shadow-2xl">
+          <div className="bg-[#12051c]/85 border border-white/15 backdrop-blur-2xl p-6 rounded-3xl space-y-5 shadow-2xl">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-white/20 border border-white/40 flex items-center justify-center text-white shrink-0 shadow-lg shadow-pink-500/30 backdrop-blur-md">
+                <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 shadow-lg shadow-pink-500/10 backdrop-blur-md">
                   <FolderDown className="w-6 h-6 animate-bounce" />
                 </div>
                 <div>
@@ -712,7 +712,7 @@ export default function SocialPipelineStudio() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-200 font-light mt-0.5 leading-relaxed">
+                  <p className="text-xs text-slate-300 font-light mt-0.5 leading-relaxed">
                     Arraste suas gravações (OBS/Shadowplay) ou <strong>baixe gameplays (YouTube/Twitch)</strong> direto na pasta{" "}
                     <code className="text-white font-mono font-bold bg-black/40 px-2 py-0.5 rounded-full border border-white/30 backdrop-blur-sm">
                       raw_gameplays/
@@ -749,32 +749,32 @@ export default function SocialPipelineStudio() {
               </div>
             </div>
 
-            {/* Status da Pasta: Métricas em Liquid Glass Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/20 text-xs">
-              <div className="liquid-glass-card p-3 rounded-2xl flex items-center gap-2.5">
+            {/* Status da Pasta: Métricas em Cards Escuros e Sóbrios (Contraste de Hierarquia) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/10 text-xs">
+              <div className="bg-[#1a0b26]/70 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl flex items-center gap-2.5">
                 <HardDrive className="w-4 h-4 text-emerald-300 shrink-0" />
                 <div>
-                  <span className="text-[10px] text-slate-300 uppercase font-mono block font-semibold">Economia no SSD:</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-mono block font-semibold">Economia no SSD:</span>
                   <span className="font-mono font-bold text-white text-xs">
                     {watcherStatus?.stats?.totalGbFreed || 0} GB liberados automaticamente
                   </span>
                 </div>
               </div>
 
-              <div className="liquid-glass-card p-3 rounded-2xl flex items-center gap-2.5">
+              <div className="bg-[#1a0b26]/70 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl flex items-center gap-2.5">
                 <FileVideo className="w-4 h-4 text-pink-300 shrink-0" />
                 <div>
-                  <span className="text-[10px] text-slate-300 uppercase font-mono block font-semibold">Gameplays Processadas:</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-mono block font-semibold">Gameplays Processadas:</span>
                   <span className="font-mono font-bold text-white text-xs">
                     {watcherStatus?.stats?.totalGameplaysProcessed || 0} partidas • {watcherStatus?.stats?.totalCutsGenerated || 0} cortes
                   </span>
                 </div>
               </div>
 
-              <div className="liquid-glass-card p-3 rounded-2xl flex items-center gap-2.5">
+              <div className="bg-[#1a0b26]/70 backdrop-blur-md border border-white/10 p-3.5 rounded-2xl flex items-center gap-2.5">
                 <Clock className="w-4 h-4 text-purple-300 shrink-0" />
                 <div>
-                  <span className="text-[10px] text-slate-300 uppercase font-mono block font-semibold">Arquivos Aguardando:</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-mono block font-semibold">Arquivos Aguardando:</span>
                   <span className="font-mono font-bold text-white text-xs">
                     {watcherStatus?.filesWaitingCount || 0} vídeos em <span className="text-pink-300 font-bold">raw_gameplays/</span>
                   </span>
@@ -784,16 +784,16 @@ export default function SocialPipelineStudio() {
 
             {/* Lista de vídeos aguardando na pasta se houver */}
             {watcherStatus?.filesWaiting && watcherStatus.filesWaiting.length > 0 && (
-              <div className="liquid-glass-card p-4 rounded-2xl space-y-2 border-white/25">
-                <span className="text-[10px] uppercase font-mono text-slate-200 font-bold block">
+              <div className="bg-[#1a0b26]/80 backdrop-blur-md border border-white/15 p-4 rounded-2xl space-y-2">
+                <span className="text-[10px] uppercase font-mono text-slate-300 font-bold block">
                   Vídeos Encontrados na Pasta:
                 </span>
                 <div className="space-y-1.5 max-h-32 overflow-y-auto">
                   {watcherStatus.filesWaiting.map((fw: any, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between text-xs font-mono text-slate-200 bg-white/10 px-3.5 py-2 rounded-xl border border-white/15 backdrop-blur-sm">
+                    <div key={idx} className="flex items-center justify-between text-xs font-mono text-slate-200 bg-white/5 px-3.5 py-2 rounded-xl border border-white/10 backdrop-blur-sm">
                       <span className="truncate max-w-[70%] text-white">{fw.name}</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-slate-300">{fw.sizeMb} MB</span>
+                        <span className="text-slate-400">{fw.sizeMb} MB</span>
                         <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${fw.isReady ? "bg-emerald-500/25 text-emerald-200 border border-emerald-400/40" : "bg-amber-500/25 text-amber-200 border border-amber-400/40"}`}>
                           {fw.isReady ? "Pronto para Cortar" : "Baixando / Gravando..."}
                         </span>
@@ -804,8 +804,50 @@ export default function SocialPipelineStudio() {
               </div>
             )}
 
-            {/* Zona Interativa de Drag & Drop para Adicionar Vídeo Diretamente */}
-            <div className="relative border-2 border-dashed border-white/25 hover:border-pink-500/60 transition-all rounded-2xl p-5 text-center bg-white/5 hover:bg-pink-500/5 group cursor-pointer backdrop-blur-sm">
+            {/* Input Bar Estilizada para Link da Live do YouTube / Twitch (Item 4) */}
+            <div className="bg-[#1a0b26]/90 border border-white/15 rounded-2xl p-4 backdrop-blur-md shadow-lg space-y-2">
+              <label className="text-[11px] font-heading uppercase font-bold text-slate-200 flex items-center gap-2">
+                <Radio className="w-3.5 h-3.5 text-pink-400" />
+                Cole o Link da sua Live ou VOD (YouTube / Twitch):
+              </label>
+              <div className="flex flex-col sm:flex-row items-center gap-2.5">
+                <input
+                  type="text"
+                  placeholder="Cole aqui o link da sua Live do YouTube ou Twitch para varredura via yt-dlp + CUDA..."
+                  value={hunterVodUrl}
+                  onChange={(e) => setHunterVodUrl(e.target.value)}
+                  className="liquid-input-glass w-full px-4 py-2.5 text-xs text-white rounded-xl placeholder:text-slate-400 bg-black/40 border-white/15 focus:border-pink-500/60"
+                />
+                <button
+                  type="button"
+                  disabled={isHuntingKills || !hunterVodUrl.trim()}
+                  onClick={async () => {
+                    await handleAnalyzeKillfeed();
+                    setCurrentStep(3);
+                    setStep3SubTab("hunter");
+                  }}
+                  className="liquid-btn-pink w-full sm:w-auto px-5 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-white whitespace-nowrap shrink-0 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-md shadow-pink-500/20"
+                >
+                  {isHuntingKills ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+                      Analisando...
+                    </>
+                  ) : (
+                    <>
+                      <Target className="w-3.5 h-3.5 text-white" />
+                      Analisar Live (2 FPS)
+                    </>
+                  )}
+                </button>
+              </div>
+              <span className="text-[10px] text-slate-400 block font-light">
+                Varredura direta na nuvem em 720p sem baixar o vídeo no disco. Localiza multikills (3K/4K/ACE) e renderiza na RTX 3060 Ti.
+              </span>
+            </div>
+
+            {/* Zona Interativa de Drag & Drop para Adicionar Vídeo Diretamente (Sóbria) */}
+            <div className="relative border-2 border-dashed border-white/15 hover:border-pink-500/50 transition-all rounded-2xl p-5 text-center bg-[#1a0b26]/60 hover:bg-[#1a0b26]/90 group cursor-pointer backdrop-blur-md">
               <input
                 type="file"
                 accept="video/mp4,video/mkv,video/mov,video/webm"
@@ -817,14 +859,14 @@ export default function SocialPipelineStudio() {
                 className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
               />
               <div className="flex flex-col items-center justify-center gap-2 pointer-events-none">
-                <div className="w-10 h-10 rounded-full bg-pink-500/20 border border-pink-400/40 flex items-center justify-center text-pink-300 group-hover:scale-110 transition shadow-lg shadow-pink-500/20">
+                <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-pink-300 group-hover:scale-110 transition shadow-md">
                   <Upload className={`w-5 h-5 ${uploadingFile ? "animate-bounce text-white" : ""}`} />
                 </div>
                 <div>
                   <span className="text-xs font-heading font-bold text-white uppercase block">
                     {uploadingFile ? "Enviando arquivo para raw_gameplays/..." : "Arraste uma Gameplay (.mp4) Aqui ou Clique para Selecionar"}
                   </span>
-                  <span className="text-[10px] text-slate-300 block mt-0.5">
+                  <span className="text-[10px] text-slate-400 block mt-0.5">
                     Gravação de partida do OBS/Shadowplay ou Replay baixado
                   </span>
                 </div>
