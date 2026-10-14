@@ -8,6 +8,7 @@ import {
     analyzeSocialAccount,
     executeMultiPlatformPublish,
 } from './social-publisher.js';
+import { shutdownGhostEngine } from './ghost-engine.js';
 
 test('formatSocialCaptions formats captions with viral hashtags for both platforms', () => {
     const result = formatSocialCaptions({
@@ -73,16 +74,28 @@ test('analyzeSocialAccount returns predictive engagement analytics and optimal t
     assert.equal(igAnalysis.handle, '@emanuel.reels');
     assert.ok(igAnalysis.bestDays.length >= 2);
     assert.ok(igAnalysis.audienceInsight.topFormat.includes('9:16'));
+
+    const ytAnalysis = await analyzeSocialAccount({
+        platform: 'youtube',
+        handle: '@emanuel.shorts',
+    });
+
+    assert.equal(ytAnalysis.platform, 'youtube');
+    assert.equal(ytAnalysis.handle, '@emanuel.shorts');
+    assert.ok(ytAnalysis.viralityScore >= 90);
+    assert.ok(ytAnalysis.bestPostingTimes.includes('18:15'));
+    assert.ok(ytAnalysis.audienceInsight.estimatedRpm.includes('0,30'));
 });
 
 test('executeMultiPlatformPublish produces dry-run validated payload without crashing', async () => {
     const execution = await executeMultiPlatformPublish({
-        platforms: ['tiktok', 'instagram'],
+        platforms: ['tiktok', 'instagram', 'youtube'],
         videoUrl: '/generated/corte-123.mp4',
         title: 'O Segredo que Ninguém Te Conta',
         description: 'Tudo o que você precisa saber para reter a atenção.',
         tiktokHandle: '@meutiktok',
         instagramHandle: '@meuinstagram',
+        youtubeHandle: '@limboinpink',
         dryRun: true,
     });
 
@@ -94,4 +107,10 @@ test('executeMultiPlatformPublish produces dry-run validated payload without cra
     assert.ok(execution.results.instagram);
     assert.equal(execution.results.instagram.mode, 'DRY_RUN_VALIDADO');
     assert.ok(execution.results.instagram.caption.includes('#reels'));
+
+    assert.ok(execution.results.youtube);
+    assert.equal(execution.results.youtube.mode, 'GHOST_ENGINE_STUDIO');
+    assert.ok(execution.results.youtube.caption.includes('#shorts'));
+
+    await shutdownGhostEngine();
 });
