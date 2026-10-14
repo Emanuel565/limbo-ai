@@ -18,6 +18,7 @@
     "test:shorts": "node --test tools/viral-short-pipeline.test.js tools/trend-hunter.test.js tools/social-publisher.test.js tools/ghost-engine.test.js tools/valorant-autopilot.test.js",
     "test:ghost": "node --test tools/ghost-engine.test.js",
     "test:valorant": "node --test tools/valorant-autopilot.test.js",
+    "test:hunter": "node --test tools/system-env-check.test.js tools/valorant-kill-cluster.test.js tools/valorant-speed-timeline.test.js tools/valorant-4layer-editor.test.js tools/detector-kills-wrapper.test.js tools/ytdlp-ingestion.test.js tools/gerador_shorts.test.js app/api/valorant-cutter/valorant-cutter.test.js",
     "shorts:plan": "node tools/viral-short-pipeline.js"
   },
   "dependencies": {
