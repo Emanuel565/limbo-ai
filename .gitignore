@@ -38,6 +38,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# superpowers
+.superpowers/
+scratch/
+
 *.tsbuildinfo
 next-env.d.ts
 

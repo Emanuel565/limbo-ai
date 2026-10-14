@@ -8,6 +8,7 @@
     "url": "https://github.com/Emanuel565/limbo-ai.git"
   },
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
