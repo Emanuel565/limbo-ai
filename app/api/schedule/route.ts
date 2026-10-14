@@ -3,9 +3,14 @@ import {
     readScheduleQueue,
     schedulePost,
     cancelScheduledPost,
+    clearScheduleQueue,
     processDuePosts,
     getNextOptimalSlot,
+    updatePostApproval,
 } from "@/tools/post-scheduler.js";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
     try {
@@ -18,12 +23,21 @@ export async function GET() {
         const queue = readScheduleQueue();
         const nextSlot = getNextOptimalSlot();
 
-        return NextResponse.json({
-            ok: true,
-            queue,
-            nextOptimalSlot: nextSlot,
-            processResult,
-        });
+        return NextResponse.json(
+            {
+                ok: true,
+                queue,
+                nextOptimalSlot: nextSlot,
+                processResult,
+            },
+            {
+                headers: {
+                    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                },
+            }
+        );
     } catch (error) {
         const message = error instanceof Error ? error.message : "Erro ao consultar fila de agendamento.";
         return NextResponse.json({ ok: false, error: message }, { status: 500 });
@@ -75,6 +89,16 @@ export async function DELETE(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const id = searchParams.get("id");
+        const clearAll = searchParams.get("clearAll") === "true" || id === "all";
+
+        if (clearAll) {
+            clearScheduleQueue();
+            return NextResponse.json({
+                ok: true,
+                message: "Fila de agendamentos limpa com sucesso. Pronto para nova gameplay!",
+                cleared: true,
+            });
+        }
 
         if (!id) {
             return NextResponse.json({ ok: false, error: "ID do agendamento é obrigatório." }, { status: 400 });
@@ -95,3 +119,32 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ ok: false, error: message }, { status: 500 });
     }
 }
+
+export async function PATCH(request: Request) {
+    try {
+        const body = await request.json();
+        const id = String(body?.id || "");
+        const status = body?.status === "REJECTED" ? "REJECTED" : "APPROVED";
+        const verdict = body?.verdict ? String(body.verdict) : "";
+
+        if (!id) {
+            return NextResponse.json({ ok: false, error: "ID do agendamento é obrigatório." }, { status: 400 });
+        }
+
+        const updated = updatePostApproval(id, { status, verdict });
+        if (!updated) {
+            return NextResponse.json({ ok: false, error: "Agendamento não encontrado." }, { status: 404 });
+        }
+
+        return NextResponse.json({
+            ok: true,
+            message: `Status do corte atualizado para ${status}!`,
+            post: updated,
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Erro ao atualizar aprovação do agendamento.";
+        return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    }
+}
+
+

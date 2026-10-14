@@ -9,7 +9,19 @@ import {
     cleanupPostFiles,
     processDuePosts,
     readScheduleQueue,
+    clearScheduleQueue,
 } from './post-scheduler.js';
+
+// Protege a fila real: backup antes dos testes e restauração ao final
+const QUEUE_FILE = path.join(process.cwd(), 'data', 'scheduled-posts.json');
+let queueBackup = null;
+test.before(() => {
+    queueBackup = fs.existsSync(QUEUE_FILE) ? fs.readFileSync(QUEUE_FILE, 'utf8') : null;
+});
+test.after(() => {
+    if (queueBackup !== null) fs.writeFileSync(QUEUE_FILE, queueBackup, 'utf8');
+    else clearScheduleQueue();
+});
 
 test('getNextOptimalSlot returns upcoming time slot today or tomorrow', () => {
     const fixedNow = new Date('2026-10-13T10:00:00.000Z');
