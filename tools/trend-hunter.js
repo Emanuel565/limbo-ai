@@ -1,4 +1,17 @@
 import { google } from 'googleapis';
+import {
+    fetchYouTubeTrendingGhost,
+    fetchTikTokTrendingGhost,
+    fetchInstagramReelsGhost,
+    getGhostEngineStats,
+} from './ghost-engine.js';
+
+export {
+    fetchYouTubeTrendingGhost,
+    fetchTikTokTrendingGhost,
+    fetchInstagramReelsGhost,
+    getGhostEngineStats,
+};
 
 export function parseIsoDuration(isoDuration) {
     if (!isoDuration) return 0;
@@ -39,7 +52,13 @@ export async function fetchTopTrendingGlobal({
     regionCode = 'BR',
     maxResults = 8,
     apiKey = process.env.YOUTUBE_API_KEY,
+    useGhostEngine = false,
 } = {}) {
+    if (useGhostEngine || (!apiKey && process.env.USE_GHOST_ENGINE === 'true')) {
+        console.log(`[TrendHunter] 👻 Roteando para GhostEngine v2 (Zero API Key, Region: ${regionCode})...`);
+        return await fetchYouTubeTrendingGhost({ regionCode, maxResults });
+    }
+
     if (!apiKey) {
         throw new Error('YOUTUBE_API_KEY não configurada no ambiente.');
     }
