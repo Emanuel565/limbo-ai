@@ -26,8 +26,11 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        const maxSeconds = Number(body?.maxSeconds) > 0 ? Number(body.maxSeconds) : (validation.isUrl ? 1200 : null);
+
         // Executa o caçador de kills a 2 FPS
         const cuts = await runKillHunterAnalysis(analysisTarget, {
+            maxSeconds,
             debug: process.env.NODE_ENV !== 'production',
         });
 

@@ -822,9 +822,9 @@ export default function SocialPipelineStudio() {
                   type="button"
                   disabled={isHuntingKills || !hunterVodUrl.trim()}
                   onClick={async () => {
-                    await handleAnalyzeKillfeed();
                     setCurrentStep(3);
                     setStep3SubTab("hunter");
+                    await handleAnalyzeKillfeed();
                   }}
                   className="liquid-btn-pink w-full sm:w-auto px-5 py-2.5 text-xs font-heading font-bold uppercase tracking-wider text-white whitespace-nowrap shrink-0 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-md shadow-pink-500/20"
                 >
@@ -1366,11 +1366,29 @@ export default function SocialPipelineStudio() {
                   )}
                 </div>
 
-                {hunterHighlights.length === 0 ? (
+                {isHuntingKills ? (
+                  <div className="liquid-glass-card p-8 rounded-2xl text-center space-y-3 border border-pink-500/40 bg-pink-950/20 shadow-lg shadow-pink-500/20 animate-pulse">
+                    <div className="w-12 h-12 rounded-2xl bg-pink-500/20 border border-pink-400/50 flex items-center justify-center text-pink-300 mx-auto">
+                      <RefreshCw className="w-6 h-6 animate-spin text-pink-400" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-heading font-bold text-sm uppercase text-white tracking-wider">
+                        Varrendo Live com Inteligência Artificial + CUDA RTX 3060 Ti
+                      </h4>
+                      <p className="text-xs font-mono text-pink-200">
+                        Conectado ao stream via yt-dlp. Analisando o Killfeed a 2 FPS e agrupando jogadas de 3K, 4K e ACE...
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 text-[10px] text-slate-300 pt-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                      <span>Processando frames em tempo real via aceleração de hardware</span>
+                    </div>
+                  </div>
+                ) : hunterHighlights.length === 0 ? (
                   <div className="liquid-glass-card p-8 rounded-2xl text-center space-y-2 border-dashed border-white/20">
                     <Target className="w-8 h-8 text-slate-500 mx-auto" />
                     <p className="text-xs font-mono text-slate-400">
-                      Nenhuma jogada detectada ainda. Cole o link de uma live ou VOD de Valorant e clique em "Buscar Jogadas".
+                      Nenhuma jogada detectada ainda. Cole o link de uma live ou VOD de Valorant e clique em "Analisar Live".
                     </p>
                   </div>
                 ) : (

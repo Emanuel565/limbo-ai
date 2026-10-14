@@ -33,10 +33,18 @@ export function parseDetectorOutput(rawOutput) {
 
 /**
  * Executa o detector em Python sobre o arquivo de vídeo ou stream
+ * @param {string} videoSource
+ * @param {object} [options]
+ * @param {string} [options.templatePath]
+ * @param {number} [options.limiar]
+ * @param {number|null} [options.maxSeconds]
+ * @param {boolean} [options.dryRun]
+ * @param {boolean} [options.debug]
  */
 export async function runKillHunterAnalysis(videoSource, {
     templatePath = path.join(process.cwd(), 'public', 'templates', 'meu_kill_template.png'),
     limiar = 0.76,
+    maxSeconds = null,
     dryRun = false,
     debug = false,
 } = {}) {
@@ -59,6 +67,9 @@ export async function runKillHunterAnalysis(videoSource, {
             const args = [scriptPath, String(videoSource), '--limiar', String(limiar)];
             if (fs.existsSync(templatePath)) {
                 args.push('--template', templatePath);
+            }
+            if (maxSeconds && Number(maxSeconds) > 0) {
+                args.push('--max-seconds', String(maxSeconds));
             }
             if (debug) {
                 args.push('--debug');
