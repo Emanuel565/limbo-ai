@@ -21,6 +21,7 @@ export function build4LayerFilterComplex(segments, {
     isSourceMuted = false,
     hookHeadline = null,
     showFastForwardBadge = false,
+    subtitlesAssPath = null,
     totalOutputDuration = 0,
 } = {}) {
     const filterParts = [];
@@ -82,14 +83,19 @@ export function build4LayerFilterComplex(segments, {
     }
     filterParts.push(`${concatInputs.join('')}concat=n=${safeSegments.length}:v=1:a=1[v_cat][a_game_cat]`);
 
-    // 4. Efeitos Finais de Vídeo (Barra de Progresso & Headline)
+    // 4. Efeitos Finais de Vídeo (Barra de Progresso & Headline & Legendas ASS)
     let vFinalFilter = '[v_cat]';
     if (hookHeadline) {
         const cleanHeadline = String(hookHeadline).replace(/['":\\%,;]/g, ' ').slice(0, 48).trim();
         vFinalFilter += `drawbox=y=130:color=black@0.70:width=iw:height=125:t=fill,drawtext=text='${cleanHeadline}':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=170,`;
     }
     const safeDur = totalOutputDuration > 0 ? totalOutputDuration : 30;
-    filterParts.push(`${vFinalFilter}drawbox=x=0:y=ih-14:w='iw*t/${safeDur}':h=14:color=0xFF1493@0.95:t=fill[vout]`);
+    let vOutChain = `drawbox=x=0:y=ih-14:w='iw*t/${safeDur}':h=14:color=0xFF1493@0.95:t=fill`;
+    if (subtitlesAssPath) {
+        const escapedAss = String(subtitlesAssPath).replace(/\\/g, '/').replace(/:/g, '\\:');
+        vOutChain += `,ass='${escapedAss}'`;
+    }
+    filterParts.push(`${vFinalFilter}${vOutChain}[vout]`);
 
     // 5. Inteligência de Áudio: Ducking ou Injeção de BGM APÓS o concat (Rule 2)
     if (hasBgm && !isSourceMuted) {
@@ -121,6 +127,7 @@ export function build4LayerFfmpegArgs({
     forceMuted = false,
     hookHeadline = null,
     showFastForwardBadge = false,
+    subtitlesAssPath = null,
 } = {}) {
     const chosenBgm = bgmPath || getOptimalBgmTrack('clutch');
     const hasBgm = Boolean(chosenBgm && fs.existsSync(chosenBgm));
@@ -138,6 +145,7 @@ export function build4LayerFfmpegArgs({
         isSourceMuted,
         hookHeadline,
         showFastForwardBadge,
+        subtitlesAssPath,
         totalOutputDuration: Math.round(totalOutputDuration),
     });
 

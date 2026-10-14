@@ -67,3 +67,21 @@ test('build4LayerFfmpegArgs handles muted source by injecting BGM track directly
     assert.ok(args.includes('-stream_loop'), 'Must loop BGM when source is muted');
     assert.ok(args.includes('public/audio/bgm/clutch-bass.mp3'));
 });
+
+test('build4LayerFilterComplex adds >> 3x drawtext badge on fast-forward segments', () => {
+    const segments = [
+        { start: 0, end: 5, speed: 1, duration: 5 },
+        { start: 5, end: 15, speed: 3, duration: 10, isFastForward: true },
+    ];
+    const { filterComplex } = build4LayerFilterComplex(segments, { showFastForwardBadge: true });
+    assert.ok(filterComplex.includes('>> 3x'), 'Must draw >> 3x indicator during fast-forward');
+});
+
+test('build4LayerFilterComplex burns .ass subtitles when subtitle path is provided', () => {
+    const segments = [{ start: 0, end: 15, speed: 1, duration: 15 }];
+    const { filterComplex } = build4LayerFilterComplex(segments, {
+        subtitlesAssPath: 'public/generated/subtitles.ass',
+    });
+    assert.ok(filterComplex.includes('ass='), 'Must include ass subtitle filter');
+    assert.ok(filterComplex.includes('subtitles.ass'), 'Must reference subtitle file');
+});
