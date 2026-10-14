@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import fs from 'node:fs';
 import path from 'node:path';
 import { validateRenderRequest } from '../validators.js';
 import { processValorantVodShorts } from '@/tools/gerador_shorts.js';
@@ -24,19 +25,29 @@ export async function POST(req: NextRequest) {
             useNvenc: true,
         });
 
-        // Integra os cortes prontos diretamente à fila de agendamento de postagens
+        // Integra os cortes prontos diretamente à fila de agendamento de postagens (apenas os que realmente renderizaram)
         const scheduledPosts = [];
-        for (const cut of (validation.cuts || [])) {
-            const cutId = cut.id || `val_${Date.now()}`;
+        for (const cut of (result.cuts || validation.cuts || [])) {
+            const cutId = cut.id || `val_cut_${cut.clipType || 'highlight'}_${Math.round(cut.startSec || 0)}s`;
             const videoFileName = `${cutId}.mp4`;
-            const videoPath = `/generated/${videoFileName}`;
+            const videoFullPath = cut.renderedPath || path.join(outputDir, videoFileName);
+            const videoUrl = cut.videoUrl || `/generated/${videoFileName}`;
+
+            // Só agenda se o arquivo de vídeo realmente existir e tiver tamanho válido no disco
+            if (!fs.existsSync(videoFullPath)) continue;
+            try {
+                const st = fs.statSync(videoFullPath);
+                if (st.size < 1000) continue;
+            } catch {
+                continue;
+            }
 
             try {
                 const scheduled = schedulePost({
                     title: cut.headline || `HIGHLIGHT ${cut.clipType || 'CLUTCH'} NO VALORANT 🎯`,
                     description: `Corte de alta retenção no Valorant #${cut.clipType || 'clutch'} #valorant #shorts`,
-                    videoUrl: videoPath,
-                    videoPath: path.join(outputDir, videoFileName),
+                    videoUrl,
+                    videoPath: videoFullPath,
                     platforms: ['tiktok', 'instagram', 'youtube'],
                     useNextOptimal: true,
                     aiApproval: {

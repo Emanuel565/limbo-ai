@@ -2,6 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { resolveFfmpegBinary } from './viral-short-pipeline.js';
 import { detectAudioLevel, getOptimalBgmTrack } from './gameplay-ai-analyzer.js';
+function getWindowsFontArg() {
+    const boldArial = 'C:/Windows/Fonts/arialbd.ttf';
+    const regArial = 'C:/Windows/Fonts/arial.ttf';
+    if (fs.existsSync(boldArial)) return "fontfile='C\\:/Windows/Fonts/arialbd.ttf':";
+    if (fs.existsSync(regArial)) return "fontfile='C\\:/Windows/Fonts/arial.ttf':";
+    return '';
+}
 
 /**
  * Constrói o filter_complex com 4 camadas verticais (9:16 - 1080x1920):
@@ -60,7 +67,7 @@ export function build4LayerFilterComplex(segments, {
             // Vídeo 3x
             let vPipe = `[v_composed]trim=start=${segStart}:end=${segEnd},setpts=0.333333*(PTS-STARTPTS)`;
             if (showFastForwardBadge) {
-                vPipe += `,drawtext=text='>> 3x':fontsize=54:fontcolor=white:x=(w-text_w)/2:y=340:box=1:boxcolor=black@0.65:boxborderw=8`;
+                vPipe += `,drawtext=${getWindowsFontArg()}text='>> 3x':fontsize=54:fontcolor=white:x=(w-text_w)/2:y=340:box=1:boxcolor=black@0.65:boxborderw=8`;
             }
             filterParts.push(`${vPipe}[v${i}]`);
 
@@ -87,7 +94,7 @@ export function build4LayerFilterComplex(segments, {
     let vFinalFilter = '[v_cat]';
     if (hookHeadline) {
         const cleanHeadline = String(hookHeadline).replace(/['":\\%,;]/g, ' ').slice(0, 48).trim();
-        vFinalFilter += `drawbox=y=130:color=black@0.70:width=iw:height=125:t=fill,drawtext=text='${cleanHeadline}':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=170,`;
+        vFinalFilter += `drawbox=y=130:color=black@0.70:width=iw:height=125:t=fill,drawtext=${getWindowsFontArg()}text='${cleanHeadline}':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=170,`;
     }
     const safeDur = totalOutputDuration > 0 ? totalOutputDuration : 30;
     let vOutChain = `drawbox=x=0:y=ih-14:w='iw*t/${safeDur}':h=14:color=0xFF1493@0.95:t=fill`;
@@ -102,8 +109,8 @@ export function build4LayerFilterComplex(segments, {
         // Áudio original existe: ducking (jogo 100% + música 25%)
         filterParts.push(`[a_game_cat]volume=1.0[a0_norm];[1:a]volume=0.25[a1_norm];[a0_norm][a1_norm]amix=inputs=2:duration=first:dropout_transition=2,volume=1.2[aout]`);
     } else if (hasBgm && isSourceMuted) {
-        // Áudio original mudo: toca somente a trilha com volume otimizado
-        filterParts.push(`[1:a]volume=0.95,afade=t=in:st=0:d=0.4[aout]`);
+        // Áudio original mudo: consome [a_game_cat] e toca a trilha com volume otimizado
+        filterParts.push(`[a_game_cat]volume=0.0[a0_mute];[1:a]volume=0.95,afade=t=in:st=0:d=0.4[a1_norm];[a0_mute][a1_norm]amix=inputs=2:duration=first:dropout_transition=2[aout]`);
     } else {
         // Apenas o áudio original do jogo
         filterParts.push(`[a_game_cat]volume=1.0[aout]`);
@@ -129,10 +136,11 @@ export function build4LayerFfmpegArgs({
     showFastForwardBadge = false,
     subtitlesAssPath = null,
 } = {}) {
-    const chosenBgm = bgmPath || getOptimalBgmTrack('clutch');
+    // Mantém 100% o áudio original do jogo. Trilha BGM só é adicionada se explicitamente configurada em bgmPath.
+    const chosenBgm = bgmPath;
     const hasBgm = Boolean(chosenBgm && fs.existsSync(chosenBgm));
     const audioLevel = forceMuted ? { isMuted: true } : detectAudioLevel(inputPath, segments[0]?.start || 0);
-    const isSourceMuted = forceMuted || audioLevel.isMuted;
+    const isSourceMuted = forceMuted || (hasBgm && audioLevel.isMuted);
 
     // Calcula duração total de saída estimada (somando segmentos e dividindo os de 3x)
     const totalOutputDuration = segments.reduce((acc, s) => {

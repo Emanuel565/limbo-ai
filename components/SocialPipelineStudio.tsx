@@ -2217,9 +2217,11 @@ export default function SocialPipelineStudio() {
 
             <div className="w-full aspect-[9/16] max-h-[60vh] bg-black rounded-2xl overflow-hidden border border-white/20 shadow-inner flex items-center justify-center">
               <video
+                key={previewPost.videoUrl}
                 src={previewPost.videoUrl}
                 controls
-                autoPlay
+                playsInline
+                preload="auto"
                 className="w-full h-full object-cover"
               />
             </div>

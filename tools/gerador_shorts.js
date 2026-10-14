@@ -94,8 +94,15 @@ export async function processValorantVodShorts(vodSource, {
                 });
 
                 const renderProc = spawnSync(ffmpegBin, ffmpegArgs, { stdio: 'inherit', timeout: 300000 });
-                if (renderProc.status === 0 && fs.existsSync(finalOutputPath)) {
+                if (renderProc.status === 0 && fs.existsSync(finalOutputPath) && fs.statSync(finalOutputPath).size > 1000) {
+                    cut.id = cutId;
+                    cut.rendered = true;
+                    cut.renderedPath = finalOutputPath;
+                    cut.videoUrl = `/generated/${path.basename(finalOutputPath)}`;
                     outputFiles.push(finalOutputPath);
+                } else {
+                    cut.rendered = false;
+                    console.error(`[gerador_shorts] Falha no FFmpeg para ${cutId}. Status: ${renderProc.status}`);
                 }
             } else {
                 // Arquivo local em disco (raw_gameplays/)
@@ -109,8 +116,15 @@ export async function processValorantVodShorts(vodSource, {
                 });
 
                 const renderProc = spawnSync(ffmpegBin, ffmpegArgs, { stdio: 'inherit', timeout: 300000 });
-                if (renderProc.status === 0 && fs.existsSync(finalOutputPath)) {
+                if (renderProc.status === 0 && fs.existsSync(finalOutputPath) && fs.statSync(finalOutputPath).size > 1000) {
+                    cut.id = cutId;
+                    cut.rendered = true;
+                    cut.renderedPath = finalOutputPath;
+                    cut.videoUrl = `/generated/${path.basename(finalOutputPath)}`;
                     outputFiles.push(finalOutputPath);
+                } else {
+                    cut.rendered = false;
+                    console.error(`[gerador_shorts] Falha no FFmpeg para ${cutId}. Status: ${renderProc.status}`);
                 }
             }
         } finally {

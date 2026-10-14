@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import path from "node:path";
-import { writeFile } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
+import { Readable } from "node:stream";
 import {
     RAW_GAMEPLAYS_DIR,
     getWatcherDaemonStatus,
@@ -25,7 +27,7 @@ export async function POST(request: Request) {
     try {
         const contentType = request.headers.get("content-type") || "";
 
-        // 1. Upload direto de arquivo de gameplay arrastado na interface
+        // 1. Upload direto de arquivo de gameplay arrastado na interface via streaming em chunks
         if (contentType.includes("multipart/form-data")) {
             const formData = await request.formData();
             const file = formData.get("file");
@@ -39,8 +41,11 @@ export async function POST(request: Request) {
 
             const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
             const targetPath = path.join(RAW_GAMEPLAYS_DIR, cleanName);
-            const bytes = await file.arrayBuffer();
-            await writeFile(targetPath, Buffer.from(bytes));
+            
+            // Grava via stream de chunks sem estourar o limite de memória do V8/Node.js
+            const nodeStream = Readable.fromWeb(file.stream() as any);
+            const fileStream = createWriteStream(targetPath);
+            await pipeline(nodeStream, fileStream);
 
             return NextResponse.json({
                 ok: true,
