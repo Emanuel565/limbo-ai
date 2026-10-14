@@ -89,6 +89,20 @@ export function getNextOptimalSlot(fromDate = new Date(), platformPreference = '
 
 /**
  * Agenda um vídeo para publicação no horário ideal
+ * @param {object} options
+ * @param {string} options.title
+ * @param {string} [options.description]
+ * @param {string} [options.videoUrl]
+ * @param {string} [options.videoPath]
+ * @param {string[]} [options.platforms]
+ * @param {string|Date} [options.scheduledFor]
+ * @param {boolean} [options.useNextOptimal]
+ * @param {boolean} [options.deleteAfterPublish]
+ * @param {string} [options.tiktokHandle]
+ * @param {string} [options.instagramHandle]
+ * @param {string} [options.youtubeHandle]
+ * @param {string} [options.niche]
+ * @param {any} [options.aiApproval]
  */
 export function schedulePost({
     title,
