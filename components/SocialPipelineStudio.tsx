@@ -93,8 +93,80 @@ export default function SocialPipelineStudio() {
   const [statusMessage, setStatusMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Sub-Aba na Etapa 3: "fila" | "analytics" | "lucro" | "chaves"
-  const [step3SubTab, setStep3SubTab] = useState<"fila" | "analytics" | "lucro" | "chaves">("fila");
+  // Sub-Aba na Etapa 3: "hunter" | "fila" | "analytics" | "lucro" | "chaves"
+  const [step3SubTab, setStep3SubTab] = useState<"hunter" | "fila" | "analytics" | "lucro" | "chaves">("hunter");
+
+  // Caçador de Kills (RTX 3060 Ti & 4-Camadas)
+  const [hunterVodUrl, setHunterVodUrl] = useState("");
+  const [hunterLocalFile, setHunterLocalFile] = useState("");
+  const [isHuntingKills, setIsHuntingKills] = useState(false);
+  const [hunterHighlights, setHunterHighlights] = useState<any[]>([]);
+  const [selectedCutIds, setSelectedCutIds] = useState<string[]>([]);
+  const [isRenderingHunter, setIsRenderingHunter] = useState(false);
+
+  async function handleAnalyzeKillfeed() {
+    if (!hunterVodUrl && !hunterLocalFile) {
+      setErrorMessage("Informe a URL da live ou selecione um arquivo local de gameplay.");
+      return;
+    }
+    setIsHuntingKills(true);
+    setErrorMessage("");
+    setStatusMessage("");
+    try {
+      const res = await fetch("/api/valorant-cutter/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceUrl: hunterVodUrl || undefined,
+          localFile: hunterLocalFile || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Falha na análise visual do Killfeed.");
+      }
+      setHunterHighlights(data.cuts || []);
+      setSelectedCutIds((data.cuts || []).map((c: any) => c.id));
+      setStatusMessage(`✓ Detecção concluída! ${data.cuts?.length || 0} jogadas de alto impacto (>= 3K / ACE) localizadas.`);
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Erro na análise de abates.");
+    } finally {
+      setIsHuntingKills(false);
+    }
+  }
+
+  async function handleRenderHunterSelection() {
+    const cutsToRender = hunterHighlights.filter((h) => selectedCutIds.includes(h.id));
+    if (cutsToRender.length === 0) {
+      setErrorMessage("Selecione pelo menos um clipe para renderizar.");
+      return;
+    }
+    setIsRenderingHunter(true);
+    setErrorMessage("");
+    setStatusMessage("");
+    try {
+      const res = await fetch("/api/valorant-cutter/render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceUrl: hunterVodUrl || undefined,
+          localFile: hunterLocalFile || undefined,
+          selectedCuts: cutsToRender,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Falha na renderização via RTX 3060 Ti.");
+      }
+      setStatusMessage(`✓ ${data.cutsProcessed} cortes 9:16 renderizados e agendados com sucesso!`);
+      await fetchQueue();
+      setStep3SubTab("fila");
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Erro na renderização.");
+    } finally {
+      setIsRenderingHunter(false);
+    }
+  }
 
   // Credenciais & GhostEngine
   const [credsStatus, setCredsStatus] = useState<any>({});
@@ -1049,6 +1121,18 @@ export default function SocialPipelineStudio() {
             <div className="liquid-track p-1.5 rounded-full flex flex-wrap gap-1.5 border-white/20">
               <button
                 type="button"
+                onClick={() => setStep3SubTab("hunter")}
+                className={`px-4 py-2 rounded-full text-xs font-heading uppercase tracking-wider transition-all cursor-pointer ${
+                  step3SubTab === "hunter"
+                    ? "liquid-btn-pink text-white font-bold shadow-md shadow-pink-500/30"
+                    : "text-slate-300 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                🎯 Caçador de Kills (RTX 3060 Ti)
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setStep3SubTab("fila")}
                 className={`px-4 py-2 rounded-full text-xs font-heading uppercase tracking-wider transition-all cursor-pointer ${
                   step3SubTab === "fila"
@@ -1145,6 +1229,200 @@ export default function SocialPipelineStudio() {
               </div>
             </div>
           </div>
+
+          {/* SUB-ABA 0: CAÇADOR DE KILLS & EDITOR 4-CAMADAS 9:16 (RTX 3060 TI) */}
+          {step3SubTab === "hunter" && (
+            <div className="space-y-5">
+              {/* Header Card com Explicação das 4 Camadas */}
+              <div className="liquid-glass-card p-5 rounded-3xl border border-pink-500/30 bg-gradient-to-r from-pink-950/30 via-slate-900/40 to-purple-950/30">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Target className="w-5 h-5 text-pink-400" />
+                      <h3 className="font-heading font-bold text-base uppercase text-white tracking-wide">
+                        Caçador de Kills & Layout 4-Camadas 9:16
+                      </h3>
+                      <span className="text-[10px] font-mono font-bold bg-pink-500/20 text-pink-300 border border-pink-500/40 px-2 py-0.5 rounded-full">
+                        RTX 3060 Ti NVENC
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                      Transforma lives longas (2h+) sem webcam em shorts dinâmicos. Enquadra o minimapa no topo esquerdo (420x420), o killfeed no topo direito (620x320), a mira centralizada e acelera intervalos vazios (&gt;8s) em 3x mantendo a música intacta.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-slate-400">FPS Análise:</span>
+                    <span className="text-xs font-mono font-bold text-emerald-300 bg-emerald-500/20 px-2.5 py-1 rounded-xl border border-emerald-400/30">
+                      2 FPS (OpenCV)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Input de Live / VOD ou Arquivo Local */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/10">
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-[11px] font-mono uppercase font-bold text-slate-300 block">
+                      Link da Live (YouTube / Twitch) ou Arquivo em raw_gameplays/:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="https://www.youtube.com/watch?v=... ou nome do arquivo .mp4"
+                      value={hunterVodUrl}
+                      onChange={(e) => setHunterVodUrl(e.target.value)}
+                      className="liquid-input-glass w-full px-4 py-2.5 text-xs text-white rounded-xl placeholder:text-slate-500"
+                    />
+                  </div>
+
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      disabled={isHuntingKills}
+                      onClick={handleAnalyzeKillfeed}
+                      className="liquid-btn-pink w-full py-2.5 px-4 rounded-xl text-xs font-heading font-bold uppercase tracking-wider text-white flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-pink-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+                    >
+                      {isHuntingKills ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                          Escaneando Killfeed...
+                        </>
+                      ) : (
+                        <>
+                          <Target className="w-4 h-4 text-white" />
+                          Buscar Jogadas (2 FPS CV)
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista de Highlights Detectados */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-heading uppercase text-slate-200 font-bold flex items-center gap-2">
+                    <Flame className="w-4 h-4 text-amber-400" />
+                    Jogadas de Alto Impacto Encontradas ({hunterHighlights.length}):
+                  </span>
+
+                  {hunterHighlights.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedCutIds.length === hunterHighlights.length) {
+                            setSelectedCutIds([]);
+                          } else {
+                            setSelectedCutIds(hunterHighlights.map((h) => h.id));
+                          }
+                        }}
+                        className="text-[11px] font-mono text-slate-300 hover:text-white underline cursor-pointer"
+                      >
+                        {selectedCutIds.length === hunterHighlights.length ? "Desmarcar Todos" : "Selecionar Todos"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {hunterHighlights.length === 0 ? (
+                  <div className="liquid-glass-card p-8 rounded-2xl text-center space-y-2 border-dashed border-white/20">
+                    <Target className="w-8 h-8 text-slate-500 mx-auto" />
+                    <p className="text-xs font-mono text-slate-400">
+                      Nenhuma jogada detectada ainda. Cole o link de uma live ou VOD de Valorant e clique em "Buscar Jogadas".
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {hunterHighlights.map((cut) => {
+                      const isSelected = selectedCutIds.includes(cut.id);
+                      const isAce = cut.clipType === "ACE";
+                      const is4K = cut.clipType === "4K";
+
+                      return (
+                        <div
+                          key={cut.id}
+                          onClick={() => {
+                            setSelectedCutIds((prev) =>
+                              prev.includes(cut.id) ? prev.filter((id) => id !== cut.id) : [...prev, cut.id]
+                            );
+                          }}
+                          className={`liquid-glass-card p-4 rounded-2xl border transition-all cursor-pointer relative ${
+                            isSelected
+                              ? "border-pink-500 bg-pink-950/20 shadow-md shadow-pink-500/20"
+                              : "border-white/10 hover:border-white/25"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span
+                              className={`text-[10px] font-heading font-black px-2.5 py-0.5 rounded-full border ${
+                                isAce
+                                  ? "bg-amber-500/20 text-amber-300 border-amber-400/40"
+                                  : is4K
+                                  ? "bg-red-500/20 text-red-300 border-red-400/40"
+                                  : "bg-teal-500/20 text-teal-300 border-teal-400/40"
+                              }`}
+                            >
+                              {cut.clipType || "3K"}
+                            </span>
+
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {}}
+                              className="accent-pink-500 w-4 h-4 rounded cursor-pointer"
+                            />
+                          </div>
+
+                          <div className="mt-2.5 space-y-1">
+                            <h4 className="font-heading font-bold text-xs uppercase text-white line-clamp-1">
+                              {cut.headline || `HIGHLIGHT ${cut.clipType}`}
+                            </h4>
+                            <div className="flex items-center gap-3 text-[10px] font-mono text-slate-300">
+                              <span>Início: {Math.floor(cut.startSec / 60)}m{Math.round(cut.startSec % 60)}s</span>
+                              <span>•</span>
+                              <span>Duração: {cut.duration}s</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-2">
+                              <span className="text-[9px] font-mono text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded-full border border-purple-500/30">
+                                {cut.killsCount || cut.killTimes?.length || 3} Abates
+                              </span>
+                              <span className="text-[9px] font-mono text-pink-300 bg-pink-500/10 px-2 py-0.5 rounded-full border border-pink-500/20">
+                                4 Camadas 9:16
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Botão de Disparo para Renderização Selecionada */}
+                {hunterHighlights.length > 0 && (
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      disabled={isRenderingHunter || selectedCutIds.length === 0}
+                      onClick={handleRenderHunterSelection}
+                      className="liquid-btn-pink w-full py-3.5 px-6 rounded-2xl text-xs font-heading font-bold uppercase tracking-wider text-white flex items-center justify-center gap-2 cursor-pointer shadow-xl shadow-pink-500/30 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50"
+                    >
+                      {isRenderingHunter ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                          Renderizando {selectedCutIds.length} Cortes na RTX 3060 Ti com NVENC...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4 text-white" />
+                          Renderizar {selectedCutIds.length} Selecionados na RTX 3060 Ti (h264_nvenc)
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* SUB-ABA 1: FILA DE POSTAGENS AGENDADAS */}
           {step3SubTab === "fila" && (
