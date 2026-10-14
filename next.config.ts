@@ -2,6 +2,17 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  serverExternalPackages: [
+    "puppeteer-extra",
+    "puppeteer-extra-plugin-stealth",
+    "puppeteer",
+    "clone-deep",
+    "merge-deep",
+    "lazy-cache",
+  ],
   images: {
     remotePatterns: [
       {

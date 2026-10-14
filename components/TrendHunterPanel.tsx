@@ -19,16 +19,22 @@ interface CandidateVideo {
   id: string;
   title: string;
   channelTitle: string;
-  publishedAt: string;
+  publishedAt?: string;
   thumbnail: string;
   views: number;
   likes: number;
   comments: number;
+  shares?: number;
   durationSeconds: number;
   durationFormatted: string;
   engagementRate: number;
   viralityScore: number;
   url: string;
+  platform?: "youtube" | "tiktok" | "instagram";
+  soundTitle?: string;
+  authorHandle?: string;
+  source?: string;
+  tags?: string[];
 }
 
 interface OllamaDecision {
@@ -51,15 +57,34 @@ interface OllamaDecision {
   isAiSelected: boolean;
 }
 
-const PRESET_NICHES = [
-  "podcast tecnologia",
-  "inteligência artificial",
-  "negócios e investimentos",
-  "clínica estética premium",
-  "desenvolvimento pessoal",
-];
+const PRESET_NICHES_BY_PLATFORM = {
+  youtube: [
+    "podcast tecnologia",
+    "inteligência artificial",
+    "negócios e investimentos",
+    "clínica estética premium",
+    "desenvolvimento pessoal",
+  ],
+  tiktok: [
+    "#viral",
+    "#corte",
+    "#marketing",
+    "#ia",
+    "#podcast",
+    "#investimentos",
+  ],
+  instagram: [
+    "#reels",
+    "#crescimento",
+    "#marketingdigital",
+    "#videoeditor",
+    "#podcastbrasil",
+  ],
+};
 
 export default function TrendHunterPanel() {
+  const [platform, setPlatform] = useState<"youtube" | "tiktok" | "instagram">("youtube");
+  const [engine, setEngine] = useState<"auto" | "ghost" | "official">("ghost");
   const [mode, setMode] = useState<"search" | "charts">("charts");
   const [regionCode, setRegionCode] = useState("BR");
   const [niche, setNiche] = useState("podcast tecnologia");
@@ -68,8 +93,15 @@ export default function TrendHunterPanel() {
   const [decision, setDecision] = useState<OllamaDecision | null>(null);
   const [error, setError] = useState("");
   const [model, setModel] = useState("llama3.1:8b");
+  const [engineUsedBadge, setEngineUsedBadge] = useState<string>("");
 
-  async function handleSearch(targetNiche = niche, currentMode = mode, currentRegion = regionCode) {
+  async function handleSearch(
+    targetNiche = niche,
+    currentMode = mode,
+    currentRegion = regionCode,
+    currentPlatform = platform,
+    currentEngine = engine
+  ) {
     setLoading(true);
     setError("");
     setDecision(null);
@@ -79,6 +111,8 @@ export default function TrendHunterPanel() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          platform: currentPlatform,
+          engine: currentEngine,
           mode: currentMode,
           regionCode: currentRegion,
           niche: targetNiche,
@@ -95,6 +129,7 @@ export default function TrendHunterPanel() {
 
       setCandidates(data.candidates || []);
       setDecision(data.selected || null);
+      setEngineUsedBadge(data.engineUsed || "");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Erro ao conectar ao Trend Hunter.";
       setError(message);
@@ -144,45 +179,97 @@ export default function TrendHunterPanel() {
             métricas de retenção, quebra de padrão e gatilhos psicológicos para viralizar no TikTok, Shorts e Reels.
           </p>
 
+          {/* Platform Selector Tabs */}
+          <div className="flex flex-wrap justify-center gap-2 mt-6">
+            {[
+              { id: "youtube", label: "YouTube Trends", icon: "🔴" },
+              { id: "tiktok", label: "TikTok Viral", icon: "🎵" },
+              { id: "instagram", label: "Instagram Reels", icon: "📸" },
+            ].map((p) => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  const newPlatform = p.id as "youtube" | "tiktok" | "instagram";
+                  setPlatform(newPlatform);
+                  const firstPreset = PRESET_NICHES_BY_PLATFORM[newPlatform][0];
+                  setNiche(firstPreset);
+                  handleSearch(firstPreset, mode, regionCode, newPlatform, engine);
+                }}
+                className={`px-5 py-2 rounded-full font-heading text-xs uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+                  platform === p.id
+                    ? "bg-[#FF1493] text-white font-bold shadow-lg shadow-[#FF1493]/35 ring-2 ring-[#FF1493]/50"
+                    : "bg-black/50 text-slate-300 border border-white/10 hover:border-[#FF1493]/40"
+                }`}
+              >
+                <span>{p.icon}</span>
+                <span>{p.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Ghost Engine Toggle & Origin Badge */}
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
+            <button
+              onClick={() => {
+                const nextEngine = engine === "ghost" ? "official" : "ghost";
+                setEngine(nextEngine);
+                handleSearch(niche, mode, regionCode, platform, nextEngine);
+              }}
+              className={`text-[11px] px-3.5 py-1.5 rounded-full font-mono flex items-center gap-2 border transition-all cursor-pointer ${
+                engine === "ghost"
+                  ? "bg-[#FF1493]/20 border-[#FF1493] text-white shadow-sm shadow-[#FF1493]/30"
+                  : "bg-white/5 border-white/10 text-slate-400 hover:text-white"
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${engine === "ghost" ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`} />
+              <span>👻 Ghost Engine v2: {engine === "ghost" ? "ATIVO (Zero API Key / Stealth)" : "Desativado (API Oficial)"}</span>
+            </button>
+            {engineUsedBadge && (
+              <span className="text-[10px] font-mono text-[#e8d9c6] px-2.5 py-1 rounded-md bg-black/50 border border-[#e8d9c6]/20">
+                Fonte: {engineUsedBadge}
+              </span>
+            )}
+          </div>
+
           {/* Mode Switcher Tabs */}
-          <div className="flex justify-center gap-3 mt-7">
+          <div className="flex justify-center gap-3 mt-5">
             <button
               onClick={() => {
                 setMode("charts");
-                handleSearch(niche, "charts", regionCode);
+                handleSearch(niche, "charts", regionCode, platform, engine);
               }}
               className={`px-6 py-2.5 rounded-full font-heading text-xs uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
                 mode === "charts"
-                  ? "bg-[#FF1493] text-white font-bold shadow-lg shadow-[#FF1493]/35 ring-2 ring-[#FF1493]/50"
-                  : "bg-black/50 text-slate-300 border border-white/10 hover:border-[#FF1493]/40"
+                  ? "bg-white/15 text-white font-bold border border-white/30"
+                  : "bg-black/40 text-slate-300 border border-white/10 hover:border-[#FF1493]/40"
               }`}
             >
               <Flame className="w-4 h-4 text-amber-300" />
-              🔥 Em Alta no Brasil (Top Charts)
+              🔥 {platform === "tiktok" ? "Top TikTok Virais" : platform === "instagram" ? "Top Reels" : "Top Charts Brasil"}
             </button>
 
             <button
               onClick={() => setMode("search")}
               className={`px-6 py-2.5 rounded-full font-heading text-xs uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
                 mode === "search"
-                  ? "bg-[#FF1493] text-white font-bold shadow-lg shadow-[#FF1493]/35 ring-2 ring-[#FF1493]/50"
-                  : "bg-black/50 text-slate-300 border border-white/10 hover:border-[#FF1493]/40"
+                  ? "bg-white/15 text-white font-bold border border-white/30"
+                  : "bg-black/40 text-slate-300 border border-white/10 hover:border-[#FF1493]/40"
               }`}
             >
               <Search className="w-4 h-4" />
-              🎯 Pesquisa Específica por Nicho
+              🎯 Pesquisa por Nicho / Hashtag
             </button>
           </div>
 
           {/* Quick Preset Pills (Only if in search mode) */}
           {mode === "search" && (
             <div className="flex flex-wrap justify-center gap-2 mt-4">
-              {PRESET_NICHES.map((preset) => (
+              {PRESET_NICHES_BY_PLATFORM[platform].map((preset) => (
                 <button
                   key={preset}
                   onClick={() => {
                     setNiche(preset);
-                    handleSearch(preset, "search", regionCode);
+                    handleSearch(preset, "search", regionCode, platform, engine);
                   }}
                   disabled={loading}
                   className={`text-xs px-4 py-1.5 rounded-full font-heading uppercase tracking-wider transition-all duration-200 cursor-pointer ${
@@ -522,15 +609,32 @@ export default function TrendHunterPanel() {
                       <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-[10px] font-heading font-bold text-white border border-white/10">
                         #{idx + 1}
                       </span>
+                      <div className="absolute top-2 right-2 flex items-center gap-1">
+                        {c.platform && (
+                          <span className="px-2 py-0.5 rounded-full bg-black/80 text-[10px] font-mono text-white border border-white/20">
+                            {c.platform === "tiktok" ? "🎵 TikTok" : c.platform === "instagram" ? "📸 Reels" : "🔴 YouTube"}
+                          </span>
+                        )}
+                        {c.source === "ghost-engine" && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-[#FF1493]/80 text-[9px] font-mono text-white">
+                            👻 Ghost
+                          </span>
+                        )}
+                      </div>
                       <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/80 text-[10px] text-white font-mono">
                         {c.durationFormatted}
                       </span>
                     </div>
 
-                    <h4 className="font-heading text-sm font-semibold text-white line-clamp-2 mb-2 group-hover:text-[#e8d9c6] transition-colors">
+                    <h4 className="font-heading text-sm font-semibold text-white line-clamp-2 mb-1 group-hover:text-[#e8d9c6] transition-colors">
                       {c.title}
                     </h4>
-                    <p className="text-xs text-slate-400 mb-4">{c.channelTitle}</p>
+                    <p className="text-xs text-slate-400 mb-2">{c.channelTitle || c.authorHandle}</p>
+                    {c.soundTitle && (
+                      <p className="text-[11px] text-[#FF1493] line-clamp-1 mb-3 flex items-center gap-1 font-mono">
+                        <span>🎵</span> {c.soundTitle}
+                      </p>
+                    )}
                   </div>
 
                   <div>

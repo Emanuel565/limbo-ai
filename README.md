@@ -12,7 +12,8 @@
 
 ```mermaid
 flowchart TD
-    A[🔥 Trend Hunter: YouTube API v3] -->|Top Charts BR / Pesquisa de Nicho| B[🤖 Ollama: Llama 3.1 / Gemma 2]
+    A1[🔥 Trend Hunter: YouTube API v3] -->|API Oficial| B[🤖 Ollama: Llama 3.1 / Gemma 2]
+    A2[👻 GhostEngine v2: Stealth XHR] -->|Zero API Key / TikTok / Reels / YouTube| B
     B -->|Matriz de Viralidade & Hook Headline| C[✂️ Shorts Pipeline Studio]
     C -->|Vídeo Original + Transcrição| D[⚡ Engine de Edição FFmpeg NVENC]
     D -->|Corte 9:16 + Legendas ASS + Áudio Loudnorm| E[📱 Vídeo Vertical Renderizado]
@@ -23,10 +24,19 @@ flowchart TD
 
 ## ⚡ Principais Módulos
 
-### 1. 🎯 Trend Hunter & Matriz Psicológica de Viralidade
-- **Modos de Descoberta:**
-  - **🔥 Em Alta no Brasil (Top Charts):** Captura em tempo real os vídeos mais populares do momento (`chart: mostPopular`, regiões `BR`, `US`, `GB`).
-  - **🎯 Pesquisa Específica por Nicho:** Busca direcionada por termos e categorias chave com ordenação por densidade de engajamento.
+### 1. 👻 GhostEngine v2 & Trend Hunter Multiplataforma (Zero API Key)
+- **Extração Resiliente Multi-Rede:**
+  - **🔴 YouTube Trending:** Coleta de Top Charts e buscas sem consumir cotas da API do Google, interceptando requisições internas de `/youtubei/v1/browse`.
+  - **🎵 TikTok Viral Spy:** Mineração de vídeos em alta, hashtags (#fyp, #viral) e áudios populares para orientar a trilha e o formato do corte.
+  - **📸 Instagram Reels Explorer:** Descoberta de Reels de alto engajamento e sons originais em alta.
+- **Os 7 Pilares Anti-Detecção Implementados:**
+  1. **Singleton Browser com Auto-Recuperação:** Processo Chromium aquecido mantido em segundo plano.
+  2. **Firewall de Recursos (Modo Texto):** Bloqueio cirúrgico de imagens, estilos e fontes, cortando 70% de banda.
+  3. **Personas Coerentes:** Navegação com spoofing de hardware real (Win10/11, GPUs NVIDIA GTX/RTX, WebGL, ruído LCG de Canvas e fuso de São Paulo).
+  4. **Pool de Abas Reutilizáveis:** Até 4 abas simultâneas que nunca morrem.
+  5. **Intercepção XHR/Fetch:** Extração direta de payloads JSON antes do DOM.
+  6. **Timing Humano (Box-Muller):** Distribuição log-normal com pico fisiológico em 250ms e retries exponenciais.
+  7. **Semáforo de Concorrência & Cache TTL:** Cache em memória de 5 minutos (< 2ms de latência).
 - **Matriz Psicológica da IA Local (Ollama):** O modelo avalia cada vídeo através de 4 dimensões científicas de retenção:
   1. **Curiosity Gap (Lacuna de Curiosidade):** Grau de mistério gerado nos primeiros segundos.
   2. **Pattern Interrupt (Quebra de Padrão):** Capacidade de interromper o scroll do usuário.
@@ -129,8 +139,11 @@ INSTAGRAM_USERNAME=@seu_instagram
 # Iniciar o servidor de desenvolvimento
 npm run dev
 
-# Executar a suíte de testes do pipeline de vídeo e do Trend Hunter
-npm run test:shorts
+# Executar todos os testes (Pipeline de Vídeo, Trend Hunter, Publicador Social e GhostEngine)
+npm test
+
+# Executar especificamente a suíte de testes do GhostEngine v2
+npm run test:ghost
 ```
 
 Acesse a interface no navegador em: **`http://localhost:3000`**

@@ -28,12 +28,12 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#14010e] text-slate-100`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased liquid-glass-canvas min-h-screen text-slate-100 selection:bg-[#FF1493]/30 selection:text-white`}
       >
         <ClientWrapper>
           <Header />
 
-          <main className="bg-[#14010e]">{children}</main>
+          <main className="min-h-[calc(100vh-80px)]">{children}</main>
 
           <Toaster position="bottom-center" />
         </ClientWrapper>

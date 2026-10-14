@@ -134,9 +134,9 @@ interface PublishResult {
 }
 
 export default function SocialPublishPanel() {
-    const [youtubeHandle, setYoutubeHandle] = useState("@emanuel.shorts");
+    const [youtubeHandle, setYoutubeHandle] = useState("@limboinpink");
     const [instagramHandle, setInstagramHandle] = useState("@limboinpink");
-    const [tiktokHandle, setTiktokHandle] = useState("@Limbo");
+    const [tiktokHandle, setTiktokHandle] = useState("@limboinpink");
     const [title, setTitle] = useState("CLUTCH 1V5 IMPOSSÍVEL NO VALORANT 💀");
     const [description, setDescription] = useState(defaultDescription);
     const [videoUrl, setVideoUrl] = useState("/generated/short-viral.mp4");
@@ -496,7 +496,7 @@ export default function SocialPublishPanel() {
     }
 
     return (
-        <section id="social" className="py-24 px-4 bg-[#14010e] relative overflow-hidden">
+        <section id="social-publish" className="py-24 px-4 bg-[#14010e] relative overflow-hidden border-t border-[#FF1493]/20">
             <div className="container mx-auto max-w-6xl relative z-10">
 
                 <div className="mb-12 text-center">

@@ -137,55 +137,251 @@
   }
 }
 
-/* Tema Deep Pink de Luxo (#FF1493) */
+/* ======================================================== */
+/* LIQUID GLASS UI KIT — GLASSMORPHISM 3D TOKENS           */
+/* ======================================================== */
 .font-heading {
   font-family: 'Bricolage Grotesque', sans-serif;
 }
 
+/* Ambient canvas with soft iridescent chromatic caustics */
+.liquid-glass-canvas {
+  background-color: #0b020e;
+  background-image: 
+    radial-gradient(at 15% 15%, rgba(168, 85, 247, 0.25) 0px, transparent 50%),
+    radial-gradient(at 85% 12%, rgba(255, 20, 147, 0.28) 0px, transparent 45%),
+    radial-gradient(at 80% 80%, rgba(45, 212, 191, 0.2) 0px, transparent 50%),
+    radial-gradient(at 20% 85%, rgba(244, 63, 94, 0.22) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(139, 92, 246, 0.15) 0px, transparent 70%);
+  background-attachment: fixed;
+}
+
+/* The main floating 3D acrylic liquid glass slab */
+.liquid-glass-pane {
+  background: rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(36px) saturate(190%);
+  -webkit-backdrop-filter: blur(36px) saturate(190%);
+  border: 1.5px solid rgba(255, 255, 255, 0.26);
+  border-radius: 2.25rem;
+  box-shadow:
+    0 35px 80px -15px rgba(0, 0, 0, 0.65),
+    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.65),
+    inset 0 -1.5px 2px 0 rgba(0, 0, 0, 0.25),
+    0 0 50px -10px rgba(255, 20, 147, 0.2);
+  position: relative;
+}
+
+/* Frosted glass cards */
+.liquid-glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 1.5rem;
+  box-shadow:
+    0 16px 36px -10px rgba(0, 0, 0, 0.4),
+    inset 0 1.2px 1.8px rgba(255, 255, 255, 0.55),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.liquid-glass-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.42);
+  box-shadow:
+    0 22px 50px -10px rgba(0, 0, 0, 0.6),
+    inset 0 1.5px 2px rgba(255, 255, 255, 0.75),
+    0 0 30px rgba(255, 20, 147, 0.25);
+  transform: translateY(-2px);
+}
+
+/* Hologram iridescent gradient glass card (Modern Glass UI) */
+.liquid-glass-hologram {
+  background: linear-gradient(135deg, rgba(254, 215, 170, 0.2) 0%, rgba(255, 20, 147, 0.24) 40%, rgba(168, 85, 247, 0.28) 80%, rgba(45, 212, 191, 0.2) 100%);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  border-radius: 1.75rem;
+  box-shadow:
+    0 25px 50px -10px rgba(255, 20, 147, 0.35),
+    inset 0 2px 3px rgba(255, 255, 255, 0.75),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* Primary Glass Pill Button (Purple Jelly) */
+.liquid-btn-primary {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.85) 0%, rgba(99, 102, 241, 0.95) 100%);
+  color: #ffffff;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 10px 25px -4px rgba(139, 92, 246, 0.6),
+    inset 0 2px 3px rgba(255, 255, 255, 0.8),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.liquid-btn-primary:hover {
+  background: linear-gradient(135deg, rgba(192, 132, 252, 0.95) 0%, rgba(129, 140, 248, 1) 100%);
+  transform: translateY(-1.5px) scale(1.01);
+  box-shadow:
+    0 15px 35px -4px rgba(139, 92, 246, 0.85),
+    inset 0 2.5px 4px rgba(255, 255, 255, 0.95);
+}
+
+/* Secondary Glass Pill Button (Cyan / Teal Jelly) */
+.liquid-btn-secondary {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.8) 0%, rgba(14, 165, 233, 0.9) 100%);
+  color: #ffffff;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 10px 25px -4px rgba(45, 212, 191, 0.55),
+    inset 0 2px 3px rgba(255, 255, 255, 0.8),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.liquid-btn-secondary:hover {
+  background: linear-gradient(135deg, rgba(94, 234, 212, 0.95) 0%, rgba(56, 189, 248, 1) 100%);
+  transform: translateY(-1.5px) scale(1.01);
+  box-shadow:
+    0 15px 35px -4px rgba(45, 212, 191, 0.75),
+    inset 0 2.5px 4px rgba(255, 255, 255, 0.95);
+}
+
+/* Pink Liquid Glass Pill Button (@limboinpink Signature) */
+.liquid-btn-pink {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  background: linear-gradient(135deg, rgba(255, 20, 147, 0.9) 0%, rgba(244, 63, 94, 0.95) 100%);
+  color: #ffffff;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 10px 28px -4px rgba(255, 20, 147, 0.65),
+    inset 0 2px 3px rgba(255, 255, 255, 0.85),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.liquid-btn-pink:hover {
+  background: linear-gradient(135deg, rgba(255, 80, 180, 0.98) 0%, rgba(251, 113, 133, 1) 100%);
+  transform: translateY(-1.5px) scale(1.01);
+  box-shadow:
+    0 16px 36px -4px rgba(255, 20, 147, 0.85),
+    inset 0 2.5px 4px rgba(255, 255, 255, 0.95);
+}
+
+/* Soft Porcelain White Pill Input */
+.liquid-input-pill {
+  background: rgba(255, 255, 255, 0.94);
+  color: #0f172a;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 6px 18px -4px rgba(0, 0, 0, 0.2),
+    inset 0 1px 2px rgba(255, 255, 255, 1),
+    inset 0 -1.5px 2px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.liquid-input-pill:focus {
+  background: #ffffff;
+  border-color: rgba(255, 20, 147, 0.7);
+  box-shadow:
+    0 8px 24px -4px rgba(255, 20, 147, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 1);
+  outline: none;
+}
+
+/* Frosted glass input (darker translucent version) */
+.liquid-input-glass {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.25),
+    0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.liquid-input-glass:focus {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 20, 147, 0.6);
+  box-shadow:
+    0 0 20px rgba(255, 20, 147, 0.35),
+    inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  outline: none;
+}
+
+/* Segmented frosted track */
+.liquid-track {
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 9999px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.liquid-badge {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.35rem 0.9rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  color: #ff69b4;
+  border: 1px solid rgba(255, 20, 147, 0.45);
+  box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, 0.6);
+}
+
+/* Backward-compatible bridges */
 .belve-pill-nav {
-  background: rgba(22, 2, 16, 0.82);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 20, 147, 0.35);
-  box-shadow: 0 10px 35px -10px rgba(0, 0, 0, 0.8), 0 0 25px -5px rgba(255, 20, 147, 0.22);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.6);
 }
 
 .belve-card {
-  background: radial-gradient(130% 130% at 50% 0%, rgba(48, 4, 35, 0.75) 0%, rgba(18, 2, 14, 0.98) 100%);
-  border: 1px solid rgba(255, 20, 147, 0.22);
-  box-shadow: 0 20px 45px -15px rgba(0, 0, 0, 0.8), 0 0 15px -3px rgba(255, 20, 147, 0.08);
+  background: rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(32px) saturate(190%);
+  -webkit-backdrop-filter: blur(32px) saturate(190%);
+  border: 1.5px solid rgba(255, 255, 255, 0.24);
+  box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.6), inset 0 1.5px 2px rgba(255, 255, 255, 0.6), inset 0 -1.5px 2px rgba(0, 0, 0, 0.2);
+  border-radius: 2rem;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .belve-card:hover {
-  border-color: rgba(255, 20, 147, 0.5);
-  box-shadow: 0 25px 55px -12px rgba(0, 0, 0, 0.9), 0 0 30px -4px rgba(255, 20, 147, 0.25);
-}
-
-.belve-badge {
-  font-family: 'Bricolage Grotesque', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 0.35rem 0.9rem;
-  border-radius: 9999px;
-  background: rgba(255, 20, 147, 0.15);
-  color: #ff69b4;
-  border: 1px solid rgba(255, 20, 147, 0.4);
-}
-
-.belve-badge-blue {
-  font-family: 'Bricolage Grotesque', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 0.35rem 0.9rem;
-  border-radius: 9999px;
-  background: rgba(255, 20, 147, 0.2);
-  color: #ffffff;
-  border: 1px solid rgba(255, 20, 147, 0.5);
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 35px 85px -12px rgba(0, 0, 0, 0.7), inset 0 2px 3px rgba(255, 255, 255, 0.8), 0 0 35px rgba(255, 20, 147, 0.25);
 }
 
 .belve-btn-champagne {
@@ -193,36 +389,18 @@
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-weight: 700;
-  background-color: #FF1493;
+  background: linear-gradient(135deg, rgba(255, 20, 147, 0.9) 0%, rgba(244, 63, 94, 0.95) 100%);
   color: #ffffff;
   border-radius: 9999px;
-  transition: all 0.25s ease;
-  box-shadow: 0 4px 20px rgba(255, 20, 147, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 10px 28px -4px rgba(255, 20, 147, 0.65), inset 0 2px 3px rgba(255, 255, 255, 0.85);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .belve-btn-champagne:hover {
-  background-color: #ff33a3;
-  transform: translateY(-1px);
-  box-shadow: 0 8px 30px rgba(255, 20, 147, 0.7);
-}
-
-.belve-btn-outline {
-  font-family: 'Bricolage Grotesque', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-weight: 600;
-  background: rgba(255, 20, 147, 0.05);
-  color: #ff80bf;
-  border: 1px solid rgba(255, 20, 147, 0.4);
-  border-radius: 9999px;
-  transition: all 0.25s ease;
-}
-
-.belve-btn-outline:hover {
-  background: rgba(255, 20, 147, 0.2);
-  border-color: #FF1493;
-  color: #ffffff;
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, rgba(255, 80, 180, 0.98) 0%, rgba(251, 113, 133, 1) 100%);
+  transform: translateY(-1.5px) scale(1.01);
+  box-shadow: 0 16px 36px -4px rgba(255, 20, 147, 0.85), inset 0 2.5px 4px rgba(255, 255, 255, 0.95);
 }
 
 .belve-gradient-text {

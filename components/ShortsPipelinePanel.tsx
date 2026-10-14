@@ -1,7 +1,28 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { Play, Sparkles, TestTube, Film, Cpu, CheckCircle2, Scissors, Send, Flame, Target, Crosshair, ArrowRight, ExternalLink, Clock, Trash2 } from "lucide-react";
+import {
+    Play,
+    Sparkles,
+    TestTube,
+    Film,
+    Cpu,
+    CheckCircle2,
+    Scissors,
+    Send,
+    Flame,
+    Target,
+    Crosshair,
+    ArrowRight,
+    ExternalLink,
+    Clock,
+    Trash2,
+    DollarSign,
+    TrendingUp,
+    Bot,
+    Zap,
+    CalendarClock,
+} from "lucide-react";
 
 interface ShortPlan {
     title: string;
@@ -81,7 +102,12 @@ export default function ShortsPipelinePanel() {
     const [scheduling, setScheduling] = useState(false);
     const [scheduleSuccessMsg, setScheduleSuccessMsg] = useState("");
 
-    // Carrega próximo horário nobre para postagem
+    // Fábrica Autônoma & Projeção de Lucro Valorant
+    const [autopilotLoading, setAutopilotLoading] = useState(false);
+    const [autopilotResult, setAutopilotResult] = useState<any>(null);
+    const [earningsProjection, setEarningsProjection] = useState<any>(null);
+
+    // Carrega próximo horário nobre para postagem e projeções de lucro
     useEffect(() => {
         fetch("/api/schedule")
             .then((r) => r.json())
@@ -91,7 +117,44 @@ export default function ShortsPipelinePanel() {
                 }
             })
             .catch(() => {});
+
+        fetch("/api/valorant-autopilot?postsPerDay=4&avgViews=35000&followers=25000")
+            .then((r) => r.json())
+            .then((data) => {
+                if (data.ok && data.projection) {
+                    setEarningsProjection(data.projection);
+                }
+            })
+            .catch(() => {});
     }, []);
+
+    async function handleTriggerAutopilot() {
+        setAutopilotLoading(true);
+        setAutopilotResult(null);
+        setError("");
+        try {
+            const response = await fetch("/api/valorant-autopilot", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    videoUrl: videoUrl || "/generated/gameplay-partida-completa.mp4",
+                    agentName: "Jett / Reyna / Vandal",
+                    cutsCount: 3,
+                    platforms: publishPlatform === "both" ? ["tiktok", "instagram"] : [publishPlatform],
+                    autoSchedule: true,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || "Erro ao acionar a fábrica autônoma.");
+            }
+            setAutopilotResult(data);
+        } catch (err: any) {
+            setError(err.message || "Falha ao disparar fábrica.");
+        } finally {
+            setAutopilotLoading(false);
+        }
+    }
 
     // Ouve eventos disparados pelo Trend Hunter
     useEffect(() => {
@@ -810,6 +873,121 @@ export default function ShortsPipelinePanel() {
                             )}
                         </div>
                     </div>
+                </div>
+
+                {/* ======================================================== */}
+                {/* 🎮 FÁBRICA AUTÔNOMA & CENTRAL DE LUCRO VALORANT           */}
+                {/* ======================================================== */}
+                <div className="mt-12 belve-card rounded-3xl p-6 md:p-10 border border-[#FF1493]/30 bg-gradient-to-b from-[#180214] to-black/90 relative overflow-hidden shadow-2xl">
+                    <div className="absolute top-0 right-0 w-80 h-80 bg-[#FF1493]/15 rounded-full blur-[100px] pointer-events-none" />
+
+                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 pb-8 border-b border-white/10 relative z-10">
+                        <div>
+                            <div className="inline-flex items-center gap-2 mb-2">
+                                <span className="belve-badge bg-[#FF1493]/20 border-[#FF1493]/50 text-white flex items-center gap-1.5 text-xs">
+                                    <Bot className="w-3.5 h-3.5 text-[#FF1493]" />
+                                    Autopilot Factory v2.0
+                                </span>
+                                <span className="text-xs font-mono text-emerald-400 font-bold bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                                    ● Admin Autônomo Ativo
+                                </span>
+                            </div>
+                            <h3 className="font-heading text-2xl md:text-3xl font-bold uppercase tracking-tight text-white">
+                                Fábrica de Postagens & Central de Lucro <span className="belve-gradient-text">Valorant</span>
+                            </h3>
+                            <p className="text-xs md:text-sm text-slate-300 max-w-2xl mt-1">
+                                O robô ingere a sua partida completa, identifica múltiplos momentos de pico de retenção (Clutches 1v5, Lineups e Miras), renderiza os cortes 9:16 e agenda as postagens nos horários nobres de gamers.
+                            </p>
+                        </div>
+
+                        {/* Botão de Disparo em 1 Clique */}
+                        <div className="shrink-0 w-full lg:w-auto">
+                            <button
+                                type="button"
+                                onClick={handleTriggerAutopilot}
+                                disabled={autopilotLoading}
+                                className="w-full lg:w-auto px-8 py-4 rounded-full bg-gradient-to-r from-[#FF1493] via-pink-600 to-amber-400 hover:opacity-95 text-white font-heading font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50 shadow-xl shadow-[#FF1493]/40"
+                            >
+                                <Zap className="w-4 h-4 fill-current text-white animate-pulse" />
+                                {autopilotLoading ? "Processando e Agendando Lote..." : "⚡ Disparar Fábrica Autônoma (3 Cortes)"}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Grid de Projeção de Faturamento e Lucro Real */}
+                    {earningsProjection && (
+                        <div className="pt-8 relative z-10">
+                            <div className="flex items-center justify-between mb-4">
+                                <span className="text-xs font-heading font-semibold uppercase tracking-wider text-[#e8d9c6] flex items-center gap-2">
+                                    <DollarSign className="w-4 h-4 text-emerald-400" />
+                                    Projeção de Faturamento Mensal (3 a 5 posts/dia nas 3 redes)
+                                </span>
+                                <span className="text-xs font-mono text-slate-400">
+                                    Base: {earningsProjection.viewsBreakdown?.totalMonthlyViews?.toLocaleString("pt-BR")} visualizações estimadas
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                <div className="p-4 rounded-2xl bg-black/50 border border-white/5">
+                                    <span className="text-[11px] text-slate-400 block font-heading uppercase">Lucro Mensal Estimado</span>
+                                    <span className="text-2xl font-black text-emerald-400 font-mono">
+                                        R$ {earningsProjection.totals?.totalMonthlyBrl?.toLocaleString("pt-BR")}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 block mt-0.5 font-mono">
+                                        ~US$ {earningsProjection.totals?.totalMonthlyUsd?.toLocaleString("pt-BR")}
+                                    </span>
+                                </div>
+
+                                <div className="p-4 rounded-2xl bg-black/50 border border-white/5">
+                                    <span className="text-[11px] text-slate-400 block font-heading uppercase">Média Diária</span>
+                                    <span className="text-2xl font-black text-white font-mono">
+                                        R$ {earningsProjection.totals?.dailyAverageBrl?.toLocaleString("pt-BR")}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 block mt-0.5">por dia na esteira</span>
+                                </div>
+
+                                <div className="p-4 rounded-2xl bg-black/50 border border-white/5">
+                                    <span className="text-[11px] text-slate-400 block font-heading uppercase">Compilados Longos YT</span>
+                                    <span className="text-xl font-bold text-violet-300 font-mono">
+                                        R$ {earningsProjection.revenueBreakdownBrl?.youtubeLongCompilations?.toLocaleString("pt-BR")}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 block mt-0.5">RPM alto de 10 min</span>
+                                </div>
+
+                                <div className="p-4 rounded-2xl bg-black/50 border border-white/5">
+                                    <span className="text-[11px] text-slate-400 block font-heading uppercase">ExitLag + Afiliados</span>
+                                    <span className="text-xl font-bold text-amber-300 font-mono">
+                                        R$ {((earningsProjection.revenueBreakdownBrl?.exitlagRecurring || 0) + (earningsProjection.revenueBreakdownBrl?.affiliateCommissions || 0)).toLocaleString("pt-BR")}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 block mt-0.5">conversão na bio</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Feedback de Cortes Gerados pela Fábrica */}
+                    {autopilotResult && (
+                        <div className="mt-4 p-5 rounded-2xl bg-black/70 border border-emerald-500/40 relative z-10 font-mono text-xs">
+                            <div className="flex items-center gap-2 text-emerald-400 font-bold mb-3 font-heading uppercase">
+                                <CheckCircle2 className="w-4 h-4" />
+                                {autopilotResult.message}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {autopilotResult.cuts?.map((c: any, i: number) => (
+                                    <div key={c.cutId} className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1">
+                                        <div className="flex justify-between items-center text-[10px] text-slate-400">
+                                            <span>CORTE #{i + 1} ({c.duration}s)</span>
+                                            <span className="text-[#FF1493] font-bold">Viral {c.viralityScore}</span>
+                                        </div>
+                                        <div className="text-white font-bold line-clamp-1">{c.hookHeadline}</div>
+                                        <div className="text-[10px] text-emerald-300">
+                                            ⏰ Agendado para {autopilotResult.scheduled?.scheduledResults?.[i]?.timeLabel || "17:15"} ({autopilotResult.scheduled?.scheduledResults?.[i]?.dayLabel || "Hoje"})
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </section>
