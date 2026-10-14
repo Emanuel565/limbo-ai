@@ -14,7 +14,12 @@ import {
 export async function GET() {
     try {
         const status = getWatcherDaemonStatus();
-        return NextResponse.json({ ok: true, status });
+        return NextResponse.json({
+            ok: true,
+            status,
+            files: status.filesWaiting || [],
+            rawDir: RAW_GAMEPLAYS_DIR,
+        });
     } catch (error) {
         return NextResponse.json(
             { ok: false, error: (error as Error).message },

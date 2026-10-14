@@ -30,29 +30,31 @@ export function build4LayerFilterComplex(segments, {
     showFastForwardBadge = false,
     subtitlesAssPath = null,
     totalOutputDuration = 0,
+    layoutStyle = 'reference_model',
 } = {}) {
     const filterParts = [];
     const safeSegments = Array.isArray(segments) && segments.length > 0
         ? segments
         : [{ start: 0, end: 15, speed: 1, duration: 15, isFastForward: false }];
 
-    // 1. Construção das 4 Camadas Visuais Base a partir de [0:v]
-    // Camada 1: Background com blur de altíssima performance (Rule 1)
+    // 1. Construção das Camadas Visuais Base a partir de [0:v]
+    // Camada 1: Background com blur atmosférico de altíssima performance (Rule 1)
     filterParts.push(`[0:v]scale=360:640:force_original_aspect_ratio=increase,crop=360:640,boxblur=15:2,eq=brightness=-0.18,scale=${width}:${height}[bg]`);
 
-    // Camada 2: Mira e ação central
-    filterParts.push(`[0:v]crop=in_w*0.48:in_h*0.58:(in_w-ow)/2:(in_h-oh)/2,scale=${width}:1080[mira]`);
-
-    // Camada 3: Minimapa no topo esquerdo (420x420)
-    filterParts.push(`[0:v]crop=380:380:20:20,scale=420:420[mapa]`);
-
-    // Camada 4: Killfeed no topo direito (620x320)
-    filterParts.push(`[0:v]crop=520:280:in_w-540:35,scale=620:320[killfeed]`);
-
-    // Composição e sobreposição das camadas
-    filterParts.push(`[bg][mira]overlay=0:(H-h)/2[b1]`);
-    filterParts.push(`[b1][mapa]overlay=30:60[b2]`);
-    filterParts.push(`[b2][killfeed]overlay=W-w-30:60[v_composed]`);
+    if (layoutStyle === 'tactical_4layer') {
+        // Layout Tático com Minimapa e Killfeed flutuantes no topo
+        filterParts.push(`[0:v]crop=in_w*0.48:in_h*0.58:(in_w-ow)/2:(in_h-oh)/2,scale=${width}:1080[mira]`);
+        filterParts.push(`[0:v]crop=380:380:20:20,scale=420:420[mapa]`);
+        filterParts.push(`[0:v]crop=520:280:in_w-540:35,scale=620:320[killfeed]`);
+        filterParts.push(`[bg][mira]overlay=0:(H-h)/2[b1]`);
+        filterParts.push(`[b1][mapa]overlay=30:60[b2]`);
+        filterParts.push(`[b2][killfeed]overlay=W-w-30:60[v_composed]`);
+    } else {
+        // Layout Modelo de Referência (game-test): Quadrado 1:1 de 1080x1080 perfeitamente centralizado em Y=420
+        // Mantém HUD superior (placar/tempo/agentes) e HUD inferior (vida/habilidades/munição) integrados e sem poluição
+        filterParts.push(`[0:v]crop=min(in_w\\,in_h):min(in_w\\,in_h):(in_w-min(in_w\\,in_h))/2:(in_h-min(in_w\\,in_h))/2,scale=${width}:1080[mira]`);
+        filterParts.push(`[bg][mira]overlay=0:(H-h)/2[v_composed]`);
+    }
 
     // 2. Fatiamento de Segmentos de Tempo & Velocidade (Fast-Forward)
     const vInputs = [];
@@ -135,6 +137,7 @@ export function build4LayerFfmpegArgs({
     hookHeadline = null,
     showFastForwardBadge = false,
     subtitlesAssPath = null,
+    layoutStyle = 'reference_model',
 } = {}) {
     // Mantém 100% o áudio original do jogo. Trilha BGM só é adicionada se explicitamente configurada em bgmPath.
     const chosenBgm = bgmPath;
@@ -155,6 +158,7 @@ export function build4LayerFfmpegArgs({
         showFastForwardBadge,
         subtitlesAssPath,
         totalOutputDuration: Math.round(totalOutputDuration),
+        layoutStyle,
     });
 
     const vCodec = useNvenc

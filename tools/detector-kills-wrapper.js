@@ -3,6 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { aggregateKillHighlights } from './valorant-kill-cluster.js';
 import { resolvePythonBinary } from './system-env-check.js';
+import { generateViralHookTitle } from './social-media-agent.js';
 
 /**
  * Converte a saída JSON do detector em objetos de Highlights tipados
@@ -27,7 +28,16 @@ export function parseDetectorOutput(rawOutput) {
         endSec: Number(item.fim_seg ?? 30),
         duration: Number(item.duracao ?? ((item.fim_seg ?? 30) - (item.inicio_seg ?? 0))),
         killTimes: Array.isArray(item.tempos_kills_seg) ? item.tempos_kills_seg : [],
-        headline: (item.tipo || '3K') === 'ACE' ? 'ACE HISTÓRICO NO VALORANT 👑' : `${item.tipo || '3K'} INSANO NO ROUND 🔥`,
+        headline: generateViralHookTitle({
+            playerNick: 'Revenge',
+            clipType: item.tipo,
+            killsCount: Array.isArray(item.tempos_kills_seg) ? item.tempos_kills_seg.length : 3,
+            killTimes: Array.isArray(item.tempos_kills_seg) ? item.tempos_kills_seg : [],
+            startSec: Number(item.inicio_seg ?? 0),
+            endSec: Number(item.fim_seg ?? 30),
+            duration: Number(item.duracao ?? ((item.fim_seg ?? 30) - (item.inicio_seg ?? 0))),
+            index: idx,
+        }),
     }));
 }
 
@@ -43,6 +53,7 @@ export function parseDetectorOutput(rawOutput) {
  */
 export async function runKillHunterAnalysis(videoSource, {
     templatePath = path.join(process.cwd(), 'public', 'templates', 'meu_kill_template.png'),
+    playerNick = 'Revenge',
     limiar = 0.76,
     maxSeconds = null,
     dryRun = false,
@@ -50,6 +61,20 @@ export async function runKillHunterAnalysis(videoSource, {
 } = {}) {
     if (dryRun || !videoSource) {
         return [];
+    }
+
+    let resolvedSource = String(videoSource).trim();
+    if (!/^https?:\/\//i.test(resolvedSource) && !path.isAbsolute(resolvedSource)) {
+        const rawPath = path.join(process.cwd(), 'raw_gameplays', resolvedSource);
+        const tempPath = path.join(process.cwd(), 'temp_cuts', resolvedSource);
+        const rootPath = path.join(process.cwd(), resolvedSource);
+        if (fs.existsSync(rawPath)) {
+            resolvedSource = rawPath;
+        } else if (fs.existsSync(tempPath)) {
+            resolvedSource = tempPath;
+        } else if (fs.existsSync(rootPath)) {
+            resolvedSource = rootPath;
+        }
     }
 
     const scriptPath = path.join(process.cwd(), 'tools', 'detector_kills.py');
@@ -64,7 +89,12 @@ export async function runKillHunterAnalysis(videoSource, {
 
     for (const py of pythonCandidates) {
         try {
-            const args = [scriptPath, String(videoSource), '--limiar', String(limiar)];
+            const args = [
+                scriptPath,
+                String(resolvedSource),
+                '--player-nick', String(playerNick),
+                '--limiar', String(limiar),
+            ];
             if (fs.existsSync(templatePath)) {
                 args.push('--template', templatePath);
             }

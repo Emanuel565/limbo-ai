@@ -26,6 +26,20 @@ export async function processValorantVodShorts(vodSource, {
     const source = vodSource.trim();
     const isUrl = /^https?:\/\//i.test(source);
 
+    let resolvedSource = source;
+    if (!isUrl && !path.isAbsolute(resolvedSource)) {
+        const rawPath = path.join(process.cwd(), 'raw_gameplays', resolvedSource);
+        const tempPath = path.join(process.cwd(), 'temp_cuts', resolvedSource);
+        const rootPath = path.join(process.cwd(), resolvedSource);
+        if (fs.existsSync(rawPath)) {
+            resolvedSource = rawPath;
+        } else if (fs.existsSync(tempPath)) {
+            resolvedSource = tempPath;
+        } else if (fs.existsSync(rootPath)) {
+            resolvedSource = rootPath;
+        }
+    }
+
     if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
     }
@@ -33,7 +47,7 @@ export async function processValorantVodShorts(vodSource, {
     // 1. Detecção de Destaques (se não foram fornecidos previamente pela UI)
     let highlights = cuts;
     if (!Array.isArray(highlights) || highlights.length === 0) {
-        highlights = await runKillHunterAnalysis(source, { debug });
+        highlights = await runKillHunterAnalysis(resolvedSource, { debug });
     }
 
     if (!Array.isArray(highlights) || highlights.length === 0) {
@@ -61,7 +75,7 @@ export async function processValorantVodShorts(vodSource, {
             continue;
         }
 
-        let inputForFfmpeg = source;
+        let inputForFfmpeg = resolvedSource;
         let tempDownloadFile = null;
 
         try {
@@ -83,7 +97,7 @@ export async function processValorantVodShorts(vodSource, {
                     end: Math.max(0, s.end - offset),
                 }));
 
-                // 4. Renderização 4-Camadas 9:16 com NVENC
+                // 4. Renderização 9:16 Modelo de Referência com NVENC (Áudio Original 100%)
                 const ffmpegArgs = build4LayerFfmpegArgs({
                     inputPath: inputForFfmpeg,
                     outputPath: finalOutputPath,
@@ -91,6 +105,7 @@ export async function processValorantVodShorts(vodSource, {
                     useNvenc,
                     hookHeadline: cut.headline,
                     showFastForwardBadge: true,
+                    layoutStyle: 'reference_model',
                 });
 
                 const renderProc = spawnSync(ffmpegBin, ffmpegArgs, { stdio: 'inherit', timeout: 300000 });
@@ -113,6 +128,7 @@ export async function processValorantVodShorts(vodSource, {
                     useNvenc,
                     hookHeadline: cut.headline,
                     showFastForwardBadge: true,
+                    layoutStyle: 'reference_model',
                 });
 
                 const renderProc = spawnSync(ffmpegBin, ffmpegArgs, { stdio: 'inherit', timeout: 300000 });

@@ -27,6 +27,7 @@ export async function GET() {
             {
                 ok: true,
                 queue,
+                posts: queue,
                 nextOptimalSlot: nextSlot,
                 processResult,
             },

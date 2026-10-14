@@ -31,7 +31,7 @@ export default function Home() {
           </h1>
 
           <p className="text-sm sm:text-base text-slate-300 font-light max-w-2xl mx-auto mb-6 leading-relaxed">
-            Pipeline linear prático em 3 etapas: selecione a jogada de <strong>Valorant</strong>, configure a renderização acelerada por GPU <strong>(RTX 3060 Ti)</strong> e automatize as postagens programadas para faturar no <strong>TikTok</strong>, <strong>Instagram</strong> e <strong>YouTube</strong>.
+            Painel único unificado: rastreie as melhores jogadas de <strong>Valorant</strong> com IA local, renderize com aceleração por hardware <strong>(RTX 3060 Ti)</strong> e gerencie a fila de postagens programadas para o <strong>TikTok</strong>, <strong>Instagram</strong> e <strong>YouTube</strong>.
           </p>
 
           {/* Badges de Hardware & IA */}

@@ -27,9 +27,11 @@ export async function POST(req: NextRequest) {
         }
 
         const maxSeconds = Number(body?.maxSeconds) > 0 ? Number(body.maxSeconds) : (validation.isUrl ? 1200 : null);
+        const playerNick = String(body?.playerNick || 'Revenge').trim();
 
-        // Executa o caçador de kills a 2 FPS
+        // Executa o caçador de kills a 2 FPS focado no jogador Revenge
         const cuts = await runKillHunterAnalysis(analysisTarget, {
+            playerNick,
             maxSeconds,
             debug: process.env.NODE_ENV !== 'production',
         });

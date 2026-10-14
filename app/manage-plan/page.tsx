@@ -1,14 +1,6 @@
-import SocialPublishPanel from '@/components/SocialPublishPanel';
+import { redirect } from 'next/navigation';
 
-function ManagePlan() {
-  return (
-    <div className="min-h-screen bg-[#14010e] text-slate-100 py-12">
-      <div className="container mx-auto px-4">
-
-        <SocialPublishPanel />
-      </div>
-    </div>
-  );
+export default function ManagePlan() {
+  redirect('/#admin-metricas');
 }
 
-export default ManagePlan;

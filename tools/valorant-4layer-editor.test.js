@@ -7,6 +7,7 @@ test('build4LayerFilterComplex builds 4 distinct layers: fast-downscaled bg blur
     const { filterComplex, outputMaps } = build4LayerFilterComplex(segments, {
         width: 1080,
         height: 1920,
+        layoutStyle: 'tactical_4layer',
     });
 
     // Rule 1: High performance downscaled blur pipeline
@@ -18,6 +19,22 @@ test('build4LayerFilterComplex builds 4 distinct layers: fast-downscaled bg blur
     assert.ok(filterComplex.includes('[mapa]'), 'Must produce minimap overlay stream');
     assert.ok(filterComplex.includes('[killfeed]'), 'Must produce killfeed overlay stream');
     assert.ok(filterComplex.includes('overlay='), 'Must chain overlays');
+    assert.ok(outputMaps.includes('[vout]'), 'Must export [vout]');
+});
+
+test('build4LayerFilterComplex builds clean reference_model layout with 1080x1080 centered gameplay and blurred bg', () => {
+    const segments = [{ start: 0, end: 15, speed: 1, duration: 15 }];
+    const { filterComplex, outputMaps } = build4LayerFilterComplex(segments, {
+        width: 1080,
+        height: 1920,
+        layoutStyle: 'reference_model',
+    });
+
+    assert.ok(filterComplex.includes('scale=360:640'), 'Must downscale bg');
+    assert.ok(filterComplex.includes('boxblur='), 'Must include boxblur');
+    assert.ok(filterComplex.includes('[bg]'), 'Must produce background stream');
+    assert.ok(filterComplex.includes('[mira]'), 'Must produce center 1:1 stream');
+    assert.ok(filterComplex.includes('overlay=0:(H-h)/2'), 'Must center 1:1 gameplay at Y=420');
     assert.ok(outputMaps.includes('[vout]'), 'Must export [vout]');
 });
 
