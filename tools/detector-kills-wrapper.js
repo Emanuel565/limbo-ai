@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import { aggregateKillHighlights } from './valorant-kill-cluster.js';
+import { resolvePythonBinary } from './system-env-check.js';
 
 /**
  * Converte a saída JSON do detector em objetos de Highlights tipados
@@ -48,7 +49,8 @@ export async function runKillHunterAnalysis(videoSource, {
         throw new Error(`Script detector_kills.py não encontrado em: ${scriptPath}`);
     }
 
-    const pythonCandidates = ['python', 'py', 'python3'];
+    const resolvedPy = resolvePythonBinary();
+    const pythonCandidates = [resolvedPy, 'python', 'py', 'python3'].filter(Boolean);
     let stdout = '';
     let executed = false;
 

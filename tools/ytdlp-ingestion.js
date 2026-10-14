@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { resolveYtdlpBinary } from './system-env-check.js';
 
 /**
  * Monta os argumentos para extrair a URL do stream direto em 720p (Modo Leitura Leve)
@@ -40,8 +41,9 @@ export async function extractStreamAnalysisUrl(url) {
     }
 
     try {
+        const bin = resolveYtdlpBinary();
         const args = buildYtdlpStreamUrlArgs(url);
-        const proc = spawnSync('yt-dlp', args, { encoding: 'utf8', timeout: 30000 });
+        const proc = spawnSync(bin, args, { encoding: 'utf8', timeout: 30000 });
         if (proc.status === 0 && proc.stdout) {
             const lines = proc.stdout.trim().split('\n').map((l) => l.trim()).filter(Boolean);
             if (lines.length > 0) {
@@ -63,8 +65,9 @@ export async function downloadSurgicalClip(url, startSec, endSec, outputPath) {
         fs.mkdirSync(outDir, { recursive: true });
     }
 
+    const bin = resolveYtdlpBinary();
     const args = buildYtdlpSectionArgs(url, startSec, endSec, outputPath);
-    const proc = spawnSync('yt-dlp', args, { encoding: 'utf8', timeout: 300000 });
+    const proc = spawnSync(bin, args, { encoding: 'utf8', timeout: 300000 });
 
     if (proc.status !== 0) {
         throw new Error(`Falha no download cirúrgico via yt-dlp: ${proc.stderr || 'Erro desconhecido'}`);
