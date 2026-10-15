@@ -11,8 +11,8 @@ export function getScheduleFilePath() {
     const isTest =
         process.env.NODE_ENV === 'test' ||
         Boolean(process.env.npm_lifecycle_event === 'test') ||
-        process.argv.includes('--test') ||
-        process.execArgv.includes('--test');
+        process.argv.some((a) => a.includes('test')) ||
+        process.execArgv.some((a) => a.includes('test'));
     return path.join(DATA_DIR, isTest ? 'test-scheduled-posts.json' : 'scheduled-posts.json');
 }
 

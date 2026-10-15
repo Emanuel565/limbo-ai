@@ -6,8 +6,8 @@ export function validateAnalyzeRequest(body) {
         return { valid: false, error: 'Corpo da requisição inválido.' };
     }
 
-    const sourceUrl = typeof body.sourceUrl === 'string' ? body.sourceUrl.trim() : '';
-    const localFile = typeof body.localFile === 'string' ? body.localFile.trim() : '';
+    const sourceUrl = typeof body.sourceUrl === 'string' ? body.sourceUrl.trim() : (typeof body.source === 'string' && /^https?:\/\//i.test(body.source) ? body.source.trim() : '');
+    const localFile = typeof body.localFile === 'string' ? body.localFile.trim() : (typeof body.source === 'string' && !/^https?:\/\//i.test(body.source) ? body.source.trim() : '');
 
     if (!sourceUrl && !localFile) {
         return { valid: false, error: 'Informe a URL da live/VOD ou o caminho do arquivo local.' };
@@ -25,8 +25,8 @@ export function validateRenderRequest(body) {
         return { valid: false, error: 'Corpo da requisição inválido.' };
     }
 
-    const sourceUrl = typeof body.sourceUrl === 'string' ? body.sourceUrl.trim() : '';
-    const localFile = typeof body.localFile === 'string' ? body.localFile.trim() : '';
+    const sourceUrl = typeof body.sourceUrl === 'string' ? body.sourceUrl.trim() : (typeof body.source === 'string' && /^https?:\/\//i.test(body.source) ? body.source.trim() : '');
+    const localFile = typeof body.localFile === 'string' ? body.localFile.trim() : (typeof body.source === 'string' && !/^https?:\/\//i.test(body.source) ? body.source.trim() : '');
     const selectedCuts = Array.isArray(body.selectedCuts) ? body.selectedCuts : [];
 
     if (!sourceUrl && !localFile) {

@@ -42,7 +42,7 @@ MAX_STATIC_DURATION_SEG = 5.5
 
 # Limiares de precisão calibrados
 LIMIAR_FULL_PADRAO = 0.74
-LIMIAR_TEXT_PADRAO = 0.78
+LIMIAR_TEXT_PADRAO = 0.755
 LIMIAR_ARROW_PADRAO = 0.65
 
 
@@ -108,7 +108,10 @@ def iter_frames(video_path, start_seconds=0.0, max_seconds=None, debug=False):
     ffmpeg_cmd = [
         ffmpeg_bin,
         '-hide_banner', '-loglevel', 'error',
+        '-hwaccel', 'cuda',
     ]
+    if str(video_path).startswith(('http://', 'https://')):
+        ffmpeg_cmd.extend(['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5'])
     if start_seconds and float(start_seconds) > 0:
         ffmpeg_cmd.extend(['-ss', str(start_seconds)])
     if max_seconds and float(max_seconds) > 0:
@@ -248,26 +251,15 @@ def processar_chunk_frames(video_path, templates, start_seconds=0.0, max_seconds
             roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
             res_txt = cv2.matchTemplate(roi_gray, t_text_gray, cv2.TM_CCOEFF_NORMED)
             _, max_v, _, max_loc = cv2.minMaxLoc(res_txt)
-            v_txt = float(max_v)
-            # O assassino fica no lado esquerdo do card (X < 280 na ROI de 560px)
-            if v_txt >= limiar_text and max_loc[0] < 280:
-                loc_y = max_loc[1]
+            # O assassino fica no lado esquerdo do card (X < 340 na ROI de 560px, antes do ícone de arma)
+            if max_loc[0] < 340:
+                v_txt = float(max_v)
+                if v_txt >= limiar_text:
+                    loc_y = max_loc[1]
 
-        # 2. Template Matching do Card Completo (se disponível)
-        if t_full is not None and roi.shape[0] >= t_full.shape[0] and roi.shape[1] >= t_full.shape[1]:
-            res_full = cv2.matchTemplate(roi, t_full, cv2.TM_CCOEFF_NORMED)
-            _, max_v, _, max_loc = cv2.minMaxLoc(res_full)
-            v_full = float(max_v)
-            if v_full >= limiar_full and loc_y is None:
-                loc_y = max_loc[1]
-
-        # 3. Template Matching da Seta Amarela
-        if t_arrow is not None and roi.shape[0] >= t_arrow.shape[0] and roi.shape[1] >= t_arrow.shape[1]:
-            res_arr = cv2.matchTemplate(roi, t_arrow, cv2.TM_CCOEFF_NORMED)
-            _, max_v, _, max_loc = cv2.minMaxLoc(res_arr)
-            v_arr = float(max_v)
-
-        is_revenge_kill = (v_txt >= limiar_text) or (v_full >= limiar_full) or (v_txt >= 0.70 and v_arr >= limiar_arrow)
+        # REQUISITO CRÍTICO: A kill DEVE ser estritamente de Revenge!
+        # NUNCA contar abates de outros jogadores por semelhança de arma ou ruído de seta.
+        is_revenge_kill = (v_txt >= limiar_text and loc_y is not None)
 
         if is_revenge_kill and loc_y is not None:
             matched_slot = None
@@ -329,7 +321,10 @@ def detectar_abates(video_path, template_path=None, player_nick="Revenge",
     if use_parallel:
         scan_limit = float(max_seconds) if (max_seconds and float(max_seconds) > 0) else total_dur
         scan_limit = min(scan_limit, total_dur)
-        chunk_size = 350.0
+        
+        # Para vídeos com mais de meia hora (> 1800s), divide em blocos de 15 a 20 minutos
+        # para utilizar os 8 GB de VRAM da placa sem inflar a memória RAM do sistema
+        chunk_size = 900.0 if scan_limit > 1800.0 else 400.0
         chunks = []
         cur = 0.0
         while cur < scan_limit:
@@ -338,10 +333,12 @@ def detectar_abates(video_path, template_path=None, player_nick="Revenge",
             cur += dur
 
         import concurrent.futures
+        import gc
         all_kills = []
-        max_workers = min(4, len(chunks))
+        # Limita a 2 workers simultâneos na GPU para manter a RAM do sistema abaixo de 150 MB
+        max_workers = 2 if len(chunks) > 1 else 1
         if debug:
-            print(f"[PARALLEL SCAN] Escaneando {scan_limit:.1f}s em {len(chunks)} chunks com {max_workers} threads...", file=sys.stderr)
+            print(f"[GPU ACCEL SCAN] Escaneando {scan_limit:.1f}s em {len(chunks)} blocos (CUDA RTX 3060 Ti, {max_workers} threads)...", file=sys.stderr)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [
@@ -362,6 +359,7 @@ def detectar_abates(video_path, template_path=None, player_nick="Revenge",
                 try:
                     res = f.result()
                     all_kills.extend(res)
+                    gc.collect()  # Libera buffers de RAM imediatamente
                 except Exception as e:
                     if debug:
                         print(f"[CHUNK ERROR] {e}", file=sys.stderr)
@@ -370,7 +368,7 @@ def detectar_abates(video_path, template_path=None, player_nick="Revenge",
         all_kills.sort()
         dedup_kills = []
         for k in all_kills:
-            if not dedup_kills or (k - dedup_kills[-1]) >= 3.0:
+            if not dedup_kills or (k - dedup_kills[-1]) >= 1.2:
                 dedup_kills.append(k)
         return agrupar_highlights(dedup_kills, video_path=video_path, filter_deathmatch=filter_deathmatch, debug=debug)
 
@@ -385,7 +383,12 @@ def detectar_abates(video_path, template_path=None, player_nick="Revenge",
         limiar_arrow=limiar_arrow,
         debug=debug
     )
-    return agrupar_highlights(kills, video_path=video_path, filter_deathmatch=filter_deathmatch, debug=debug)
+    kills.sort()
+    dedup_kills = []
+    for k in kills:
+        if not dedup_kills or (k - dedup_kills[-1]) >= 1.2:
+            dedup_kills.append(k)
+    return agrupar_highlights(dedup_kills, video_path=video_path, filter_deathmatch=filter_deathmatch, debug=debug)
 
 
 def extrair_frame_em_segundo(video_path, seg):
@@ -408,6 +411,7 @@ def extrair_frame_em_segundo(video_path, seg):
         cmd = [
             ffmpeg_bin,
             '-hide_banner', '-loglevel', 'error',
+            '-hwaccel', 'cuda',
         ]
         if str(video_path).startswith(('http://', 'https://')):
             cmd.extend(['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5'])
@@ -544,23 +548,41 @@ def agrupar_highlights(tempos_kills, janela_seg=40, min_kills=3, pre_margin=4.0,
         duracao = round(fim - inicio, 2)
 
         # 2. Validação Visual de HUD do Modo de Jogo por Consenso Multi-Amostras:
+        confirmed_frame = None
         if filter_deathmatch and video_path:
             sample_offsets = [inicio + 1.5, c[0], c[-1]]
             dm_votes = 0
             valid_samples = 0
+
             for s_time in sample_offsets:
                 sample_t = max(0.0, float(s_time))
                 frame_sample = extrair_frame_em_segundo(video_path, sample_t)
                 if frame_sample is not None:
                     valid_samples += 1
-                    if classificar_modo_hud(frame_sample) == 'MATA_MATA':
+                    mode = classificar_modo_hud(frame_sample)
+                    if mode == 'MATA_MATA':
                         dm_votes += 1
-            
-            # Descarta apenas se a maioria das amostras confirmar Mata-Mata
-            if valid_samples > 0 and dm_votes >= ((valid_samples // 2) + 1):
+                    else:
+                        confirmed_frame = frame_sample
+
+            # No 5v5 NUNCA existe a barra de 12 jogadores do Mata-Mata.
+            # Se houver qualquer voto para Mata-Mata (ou a maioria), o corte é descartado.
+            if valid_samples > 0 and dm_votes >= 1:
                 if debug:
                     print(f"[FILTRO MATA-MATA] Corte em {inicio}s-{fim}s descartado: HUD identificado como Mata-Mata ({dm_votes}/{valid_samples} frames).", file=sys.stderr)
                 continue
+
+        # Gera thumbnail compacto em memória (WebP base64, ~3KB) sem salvar nenhum JPG no disco
+        thumb_b64 = None
+        if confirmed_frame is not None:
+            try:
+                import base64
+                small_prev = cv2.resize(confirmed_frame, (320, 180), interpolation=cv2.INTER_AREA)
+                ok, enc = cv2.imencode('.webp', small_prev, [cv2.IMWRITE_WEBP_QUALITY, 65])
+                if ok:
+                    thumb_b64 = f"data:image/webp;base64,{base64.b64encode(enc).decode('ascii')}"
+            except Exception:
+                pass
 
         tipo = "3K"
         if count == 4:
@@ -578,6 +600,7 @@ def agrupar_highlights(tempos_kills, janela_seg=40, min_kills=3, pre_margin=4.0,
             "modo": "COMPETITIVO_OU_SEM_CLASS",
             "game_mode": "COMPETITIVE_OR_UNRATED",
             "is_competitive_or_unrated": True,
+            "thumbnail": thumb_b64,
         })
 
     return resultados
@@ -589,6 +612,7 @@ def main():
     parser.add_argument("--template", default="public/templates/meu_kill_template.png", help="Caminho do template do nickname")
     parser.add_argument("--player-nick", default="Revenge", help="Nickname do jogador no Valorant")
     parser.add_argument("--limiar", type=float, default=LIMIAR_FULL_PADRAO, help="Limiar de correlação para card completo")
+    parser.add_argument("--limiar-text", type=float, default=None, help="Limiar de correlação para texto Revenge")
     parser.add_argument("--start-seconds", type=float, default=0.0, help="Segundo inicial para começar a escanear")
     parser.add_argument("--max-seconds", type=float, default=None, help="Limite máximo de segundos para escanear")
     parser.add_argument("--filter-deathmatch", action="store_true", default=True, help="Filtra e descarta clipes de Mata-Mata")
@@ -597,11 +621,14 @@ def main():
 
     args = parser.parse_args()
 
+    limiar_txt = args.limiar_text if args.limiar_text is not None else min(float(args.limiar), LIMIAR_TEXT_PADRAO)
+
     resultados = detectar_abates(
         args.video_path,
         template_path=args.template,
         player_nick=args.player_nick,
         limiar_full=args.limiar,
+        limiar_text=limiar_txt,
         start_seconds=args.start_seconds,
         max_seconds=args.max_seconds,
         filter_deathmatch=args.filter_deathmatch,

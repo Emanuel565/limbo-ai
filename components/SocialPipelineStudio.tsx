@@ -1291,6 +1291,20 @@ export default function SocialPipelineStudio() {
                       </span>
                     </div>
 
+                    {cut.thumbnail && (
+                      <div className="relative w-full aspect-video rounded-xl overflow-hidden mb-2 border border-white/10 bg-black/40 shadow-inner">
+                        <img
+                          src={cut.thumbnail}
+                          alt={cut.headline || "Highlight Preview"}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-sm text-[9px] font-mono text-white/90 border border-white/10">
+                          {Math.round(cut.startSec || 0)}s - {Math.round(cut.endSec || 0)}s
+                        </div>
+                      </div>
+                    )}
+
                     <div className="font-heading font-bold text-xs text-white truncate mb-1">
                       {cut.headline || `${cut.killsCount || 3}K Insano no Round`}
                     </div>

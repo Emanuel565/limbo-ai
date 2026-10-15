@@ -32,6 +32,7 @@ export function parseDetectorOutput(rawOutput, { filterDeathmatch = true, player
             killTimes: Array.isArray(item.tempos_kills_seg) ? item.tempos_kills_seg : [],
             gameMode: item.game_mode || item.modo || 'COMPETITIVE_OR_UNRATED',
             isCompetitiveOrUnrated: item.is_competitive_or_unrated !== false,
+            thumbnail: item.thumbnail || null,
             aiApproval: approval,
             viralScore: approval.viralScore,
             isApproved: approval.status === 'APPROVED',
@@ -73,6 +74,7 @@ export async function runKillHunterAnalysis(videoSource, {
     templatePath = path.join(process.cwd(), 'public', 'templates', 'meu_kill_template.png'),
     playerNick = 'Revenge',
     limiar = 0.76,
+    limiarText = 0.755,
     startSeconds = 0.0,
     maxSeconds = null,
     filterDeathmatch = true,
@@ -114,6 +116,7 @@ export async function runKillHunterAnalysis(videoSource, {
                 String(resolvedSource),
                 '--player-nick', String(playerNick),
                 '--limiar', String(limiar),
+                '--limiar-text', String(limiarText),
             ];
             if (fs.existsSync(templatePath)) {
                 args.push('--template', templatePath);
@@ -133,7 +136,7 @@ export async function runKillHunterAnalysis(videoSource, {
                 args.push('--debug');
             }
 
-            const proc = spawnSync(py, args, { encoding: 'utf8', timeout: 300000 });
+            const proc = spawnSync(py, args, { encoding: 'utf8', timeout: 600000 });
             if (proc.status === 0 && proc.stdout) {
                 stdout = proc.stdout.trim();
                 executed = true;
