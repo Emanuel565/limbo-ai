@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-Motor de Visão Computacional Refinado para Caçador de Kills do Valorant.
+Motor de Visão Computacional de Alta Performance para Caçador de Kills do Valorant.
 Focado especificamente no jogador "Revenge", detectando com máxima precisão
 abates de 3K, 4K e ACE em streams ou arquivos gravados pelo OBS.
 
-Pilares da Detecção Certeira:
-1. Resolução Nativa 1080p (ROI: 560x320 no canto superior direito) sem perda de nitidez.
-2. Multi-Template Matching:
-   - revenge_text_only.png (Nickname 'Revenge' em fonte branca sobre verde-água)
-   - revenge_arrow_template.png (Seta amarela indicadora exclusiva de kill do próprio jogador)
-   - meu_kill_template.png (Card completo de abate)
-3. Eliminação total de falso-positivos:
-   - NUNCA dispara em elementos estáticos de tela de carregamento (COMPETITIVO SÃO PAULO).
-   - NUNCA confunde abates de aliados ou inimigos com abates do Revenge.
+Características:
+1. Resolução Nativa 1080p (ROI: 560x320 no canto superior direito).
+2. Template Matching em escala de cinza normalizada para o texto 'Revenge':
+   - 100% agnóstico a agente (Astra, Killjoy, Reyna, Jett, etc.)
+   - 100% agnóstico a cor de time (Ataque/Defesa, daltonismo)
+   - Valida que o jogador é o assassino (X < 280) e não a vítima.
+3. Anti-Tela Estática:
    - Suprime elementos estáticos que permaneçam por mais de 5.5s na mesma posição.
+4. Escaneamento Paralelo Inteligente para VODs e Streams:
+   - Divide streams longos em chunks processados concorrentemente via FFmpeg Pipe.
 """
 
 import sys
@@ -42,7 +42,7 @@ MAX_STATIC_DURATION_SEG = 5.5
 
 # Limiares de precisão calibrados
 LIMIAR_FULL_PADRAO = 0.74
-LIMIAR_TEXT_PADRAO = 0.58
+LIMIAR_TEXT_PADRAO = 0.78
 LIMIAR_ARROW_PADRAO = 0.65
 
 
@@ -61,10 +61,38 @@ def get_video_dimensions(video_path):
     return 1920, 1080
 
 
-def iter_frames(video_path, max_seconds=None, debug=False):
+def get_video_duration(video_path):
+    """Obtém a duração total do vídeo ou stream em segundos."""
+    try:
+        cmd = [
+            'ffprobe', '-v', 'error',
+            '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            str(video_path)
+        ]
+        out = subprocess.check_output(cmd, timeout=10, stderr=subprocess.DEVNULL)
+        d = float(out.strip())
+        if d > 0:
+            return d
+    except Exception:
+        pass
+    try:
+        cap = cv2.VideoCapture(str(video_path))
+        if cap.isOpened():
+            fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+            frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+            cap.release()
+            if frames > 0:
+                return float(frames / fps)
+    except Exception:
+        pass
+    return None
+
+
+def iter_frames(video_path, start_seconds=0.0, max_seconds=None, debug=False):
     """
     Gera (tempo_atual_seg, roi_frame_1080p) a 2 FPS.
-    Tenta primeiro via FFmpeg Pipe com aceleração de hardware CUDA (14x mais rápido).
+    Tenta primeiro via FFmpeg Pipe com busca rápida (-ss).
     Fallback automático para cv2.VideoCapture se FFmpeg falhar.
     Sempre normaliza o ROI para 560x320 (escala 1080p).
     """
@@ -72,19 +100,18 @@ def iter_frames(video_path, max_seconds=None, debug=False):
 
     # Determina o filtro de crop do FFmpeg dependendo da resolução de entrada
     if h_vid <= 720:
-        # Vídeo 720p: crop 373x213 e escala para 560x320
         vf_filter = "fps=2,crop=373:213:900:23,scale=560:320:flags=bicubic"
     else:
-        # Vídeo 1080p ou superior: crop nativo 560x320
         vf_filter = f"fps=2,crop={NATIVE_1080_ROI_W}:{NATIVE_1080_ROI_H}:{NATIVE_1080_ROI_X}:{NATIVE_1080_ROI_Y}"
 
     ffmpeg_bin = os.environ.get("FFMPEG_PATH", "ffmpeg")
     ffmpeg_cmd = [
         ffmpeg_bin,
         '-hide_banner', '-loglevel', 'error',
-        '-hwaccel', 'cuda',
     ]
-    if max_seconds:
+    if start_seconds and float(start_seconds) > 0:
+        ffmpeg_cmd.extend(['-ss', str(start_seconds)])
+    if max_seconds and float(max_seconds) > 0:
         ffmpeg_cmd.extend(['-t', str(max_seconds)])
     ffmpeg_cmd.extend([
         '-i', str(video_path),
@@ -96,6 +123,7 @@ def iter_frames(video_path, max_seconds=None, debug=False):
 
     frame_bytes = NATIVE_1080_ROI_W * NATIVE_1080_ROI_H * 3
     frames_yielded = 0
+    base_time = float(start_seconds or 0.0)
     try:
         proc = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         while True:
@@ -103,7 +131,7 @@ def iter_frames(video_path, max_seconds=None, debug=False):
             if not raw or len(raw) < frame_bytes:
                 break
             roi = np.frombuffer(raw, dtype=np.uint8).reshape((NATIVE_1080_ROI_H, NATIVE_1080_ROI_W, 3))
-            timestamp = round(frames_yielded * 0.5, 2)
+            timestamp = round(base_time + (frames_yielded * 0.5), 2)
             yield timestamp, roi
             frames_yielded += 1
         proc.stdout.close()
@@ -125,6 +153,9 @@ def iter_frames(video_path, max_seconds=None, debug=False):
     if fps <= 0 or np.isnan(fps):
         fps = 30.0
 
+    if base_time > 0:
+        cap.set(cv2.CAP_PROP_POS_MSEC, base_time * 1000.0)
+
     frame_step = max(1, int(round(fps / 2.0)))
     frame_idx = 0
 
@@ -137,8 +168,8 @@ def iter_frames(video_path, max_seconds=None, debug=False):
             frame_idx += 1
             continue
 
-        tempo_atual_seg = round(frame_idx / fps, 2)
-        if max_seconds and tempo_atual_seg > max_seconds:
+        tempo_atual_seg = round(base_time + (frame_idx / fps), 2)
+        if max_seconds and (tempo_atual_seg - base_time) > float(max_seconds):
             break
 
         h, w = frame.shape[:2]
@@ -156,15 +187,16 @@ def iter_frames(video_path, max_seconds=None, debug=False):
 
 def carregar_templates(template_path=None):
     """
-    Carrega o trio de templates cirúrgicos do Revenge:
-    1. full: card completo de abate
-    2. text: texto 'Reven' em fonte branca com fundo verde-água (funciona com QUALQUER agente)
-    3. arrow: seta amarela indicadora esquerda
+    Carrega o conjunto de templates calibrados para detecção de abates:
+    1. text_gray: Texto limpo 'Revenge' em escala de cinza normalizada (agnóstico a agente, time e cor)
+    2. full: Card completo de abate (opcional)
+    3. arrow: Seta amarela indicadora esquerda
     """
     base_dir = os.path.dirname(template_path or "public/templates/meu_kill_template.png")
     templates = {
         "full": None,
         "text": None,
+        "text_gray": None,
         "arrow": None,
     }
 
@@ -172,9 +204,13 @@ def carregar_templates(template_path=None):
     if os.path.exists(t_full_path):
         templates["full"] = cv2.imread(t_full_path, cv2.IMREAD_COLOR)
 
+    t_clean_path = os.path.join(base_dir, "revenge_text_clean.png")
     t_text_path = os.path.join(base_dir, "revenge_text_only.png")
-    if os.path.exists(t_text_path):
-        templates["text"] = cv2.imread(t_text_path, cv2.IMREAD_COLOR)
+    chosen_path = t_clean_path if os.path.exists(t_clean_path) else t_text_path
+    if os.path.exists(chosen_path):
+        t_img = cv2.imread(chosen_path, cv2.IMREAD_COLOR)
+        templates["text"] = t_img
+        templates["text_gray"] = cv2.cvtColor(t_img, cv2.COLOR_BGR2GRAY)
 
     t_arrow_path = os.path.join(base_dir, "revenge_arrow_template.png")
     if os.path.exists(t_arrow_path):
@@ -183,26 +219,22 @@ def carregar_templates(template_path=None):
     return templates
 
 
-def detectar_abates(video_path, template_path=None, player_nick="Revenge",
-                    limiar_full=LIMIAR_FULL_PADRAO, limiar_text=LIMIAR_TEXT_PADRAO,
-                    limiar_arrow=LIMIAR_ARROW_PADRAO, max_seconds=None, debug=False):
+def processar_chunk_frames(video_path, templates, start_seconds=0.0, max_seconds=None,
+                           limiar_full=LIMIAR_FULL_PADRAO, limiar_text=LIMIAR_TEXT_PADRAO,
+                           limiar_arrow=LIMIAR_ARROW_PADRAO, debug=False):
     """
-    Rastreia com precisão máxima apenas os abates legítimos efetuados pelo jogador Revenge.
+    Processa um trecho do vídeo frame a frame extraindo timestamps de abates confirmados.
     """
-    if not video_path:
-        return []
+    t_full = templates.get("full")
+    t_text_gray = templates.get("text_gray")
+    t_arrow = templates.get("arrow")
 
-    templates = carregar_templates(template_path)
-    t_full = templates["full"]
-    t_text = templates["text"]
-    t_arrow = templates["arrow"]
-
-    linhas_ativas = {}          # {slot_y: tempo_inicio}
-    static_tracker = {}         # {slot_y: {"first_seen": t, "last_seen": t}}
+    linhas_ativas = {}
+    static_tracker = {}
     kills_detectadas = []
     frame_count = 0
 
-    for tempo_atual_seg, roi in iter_frames(video_path, max_seconds=max_seconds, debug=debug):
+    for tempo_atual_seg, roi in iter_frames(video_path, start_seconds=start_seconds, max_seconds=max_seconds, debug=debug):
         frame_count += 1
         y_detectados = []
 
@@ -211,20 +243,22 @@ def detectar_abates(video_path, template_path=None, player_nick="Revenge",
         v_arr = 0.0
         loc_y = None
 
-        # 1. Template Matching do Card Completo
+        # 1. Template Matching em escala de cinza para o texto 'Revenge' (agnóstico a agente e cores de ataque/defesa)
+        if t_text_gray is not None and roi.shape[0] >= t_text_gray.shape[0] and roi.shape[1] >= t_text_gray.shape[1]:
+            roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+            res_txt = cv2.matchTemplate(roi_gray, t_text_gray, cv2.TM_CCOEFF_NORMED)
+            _, max_v, _, max_loc = cv2.minMaxLoc(res_txt)
+            v_txt = float(max_v)
+            # O assassino fica no lado esquerdo do card (X < 280 na ROI de 560px)
+            if v_txt >= limiar_text and max_loc[0] < 280:
+                loc_y = max_loc[1]
+
+        # 2. Template Matching do Card Completo (se disponível)
         if t_full is not None and roi.shape[0] >= t_full.shape[0] and roi.shape[1] >= t_full.shape[1]:
             res_full = cv2.matchTemplate(roi, t_full, cv2.TM_CCOEFF_NORMED)
             _, max_v, _, max_loc = cv2.minMaxLoc(res_full)
             v_full = float(max_v)
-            if v_full >= limiar_full:
-                loc_y = max_loc[1]
-
-        # 2. Template Matching do Texto 'Revenge' (agnóstico a agente)
-        if t_text is not None and roi.shape[0] >= t_text.shape[0] and roi.shape[1] >= t_text.shape[1]:
-            res_txt = cv2.matchTemplate(roi, t_text, cv2.TM_CCOEFF_NORMED)
-            _, max_v, _, max_loc = cv2.minMaxLoc(res_txt)
-            v_txt = float(max_v)
-            if v_txt >= limiar_text and loc_y is None:
+            if v_full >= limiar_full and loc_y is None:
                 loc_y = max_loc[1]
 
         # 3. Template Matching da Seta Amarela
@@ -233,12 +267,9 @@ def detectar_abates(video_path, template_path=None, player_nick="Revenge",
             _, max_v, _, max_loc = cv2.minMaxLoc(res_arr)
             v_arr = float(max_v)
 
-        # Regra de Ouro: Confirmação Estrita do Abate de Revenge
-        # (v_full >= 0.74) OU (v_txt >= 0.58 E v_arr >= 0.65) OU (v_txt >= 0.70)
-        is_revenge_kill = (v_full >= limiar_full) or (v_txt >= limiar_text and v_arr >= limiar_arrow) or (v_txt >= 0.70)
+        is_revenge_kill = (v_txt >= limiar_text) or (v_full >= limiar_full) or (v_txt >= 0.70 and v_arr >= limiar_arrow)
 
         if is_revenge_kill and loc_y is not None:
-            # Encontra ou agrupa no slot Y mais próximo
             matched_slot = None
             for y_k in list(static_tracker.keys()):
                 if abs(loc_y - y_k) < ALTURA_MINIMA_LINHA_1080:
@@ -251,18 +282,14 @@ def detectar_abates(video_path, template_path=None, player_nick="Revenge",
             else:
                 static_tracker[matched_slot]["last_seen"] = tempo_atual_seg
 
-            # Anti-Tela Estática: se o elemento persistir por mais de 5.5s na mesma posição,
-            # é elemento fixo de UI (placar, tela de carregamento, lobby)
             duracao_visivel = static_tracker[matched_slot]["last_seen"] - static_tracker[matched_slot]["first_seen"]
             if duracao_visivel <= MAX_STATIC_DURATION_SEG:
                 y_detectados.append(matched_slot)
 
-        # Limpeza de elementos que desapareceram da tela
         for slot_y in list(static_tracker.keys()):
             if (tempo_atual_seg - static_tracker[slot_y]["last_seen"]) > 2.0:
                 del static_tracker[slot_y]
 
-        # Limpeza de cooldown de linhas ativas
         linhas_ativas = {y: t for y, t in linhas_ativas.items() if (tempo_atual_seg - t) < COOLDOWN_KILL_SEG}
 
         for y in y_detectados:
@@ -276,20 +303,184 @@ def detectar_abates(video_path, template_path=None, player_nick="Revenge",
                 linhas_ativas[y] = tempo_atual_seg
                 kills_detectadas.append(tempo_atual_seg)
                 if debug:
-                    print(f"[REVENGE KILL DETECTADA] {tempo_atual_seg}s (slot Y: {y} | Full: {v_full:.2f}, Txt: {v_txt:.2f}, Arr: {v_arr:.2f})", file=sys.stderr)
+                    print(f"[REVENGE KILL DETECTADA] {tempo_atual_seg}s (slot Y: {y} | Txt: {v_txt:.2f}, Full: {v_full:.2f})", file=sys.stderr)
 
-        if debug and frame_count % 60 == 0:
-            print(f"[SCANNING] {tempo_atual_seg}s analisados | {len(kills_detectadas)} abates confirmados de Revenge", file=sys.stderr)
-
-    return agrupar_highlights(kills_detectadas)
+    return kills_detectadas
 
 
-def agrupar_highlights(tempos_kills, janela_seg=40, min_kills=3, pre_margin=4.0, post_margin=3.5):
+def detectar_abates(video_path, template_path=None, player_nick="Revenge",
+                    limiar_full=LIMIAR_FULL_PADRAO, limiar_text=LIMIAR_TEXT_PADRAO,
+                    limiar_arrow=LIMIAR_ARROW_PADRAO, start_seconds=0.0, max_seconds=None,
+                    filter_deathmatch=True, debug=False):
+    """
+    Rastreia com máxima precisão e velocidade os abates de Revenge.
+    Suporta escaneamento paralelo inteligente para streams e VODs longos.
+    """
+    if not video_path:
+        return []
+
+    templates = carregar_templates(template_path)
+    is_stream = str(video_path).startswith("http://") or str(video_path).startswith("https://")
+    total_dur = get_video_duration(video_path)
+
+    # Se for stream ou vídeo longo e não tiver start_seconds explícito, usa escaneamento paralelo em chunks
+    use_parallel = is_stream and (total_dur is not None) and (total_dur > 150.0) and (not start_seconds or float(start_seconds) == 0.0)
+
+    if use_parallel:
+        scan_limit = float(max_seconds) if (max_seconds and float(max_seconds) > 0) else total_dur
+        scan_limit = min(scan_limit, total_dur)
+        chunk_size = 350.0
+        chunks = []
+        cur = 0.0
+        while cur < scan_limit:
+            dur = min(chunk_size, scan_limit - cur)
+            chunks.append((cur, dur))
+            cur += dur
+
+        import concurrent.futures
+        all_kills = []
+        max_workers = min(4, len(chunks))
+        if debug:
+            print(f"[PARALLEL SCAN] Escaneando {scan_limit:.1f}s em {len(chunks)} chunks com {max_workers} threads...", file=sys.stderr)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(
+                    processar_chunk_frames,
+                    video_path,
+                    templates,
+                    start_seconds=c[0],
+                    max_seconds=c[1],
+                    limiar_full=limiar_full,
+                    limiar_text=limiar_text,
+                    limiar_arrow=limiar_arrow,
+                    debug=debug
+                )
+                for c in chunks
+            ]
+            for f in concurrent.futures.as_completed(futures):
+                try:
+                    res = f.result()
+                    all_kills.extend(res)
+                except Exception as e:
+                    if debug:
+                        print(f"[CHUNK ERROR] {e}", file=sys.stderr)
+
+        # Deduplicação pós-merge
+        all_kills.sort()
+        dedup_kills = []
+        for k in all_kills:
+            if not dedup_kills or (k - dedup_kills[-1]) >= 3.0:
+                dedup_kills.append(k)
+        return agrupar_highlights(dedup_kills, video_path=video_path, filter_deathmatch=filter_deathmatch, debug=debug)
+
+    # Modo sequencial (para vídeos curtos ou arquivos locais em SSD)
+    kills = processar_chunk_frames(
+        video_path,
+        templates,
+        start_seconds=start_seconds,
+        max_seconds=max_seconds,
+        limiar_full=limiar_full,
+        limiar_text=limiar_text,
+        limiar_arrow=limiar_arrow,
+        debug=debug
+    )
+    return agrupar_highlights(kills, video_path=video_path, filter_deathmatch=filter_deathmatch, debug=debug)
+
+
+def extrair_frame_em_segundo(video_path, seg):
+    """Extrai um único frame em BGR no segundo especificado para validação de HUD."""
+    if not video_path:
+        return None
+    try:
+        if os.path.exists(str(video_path)):
+            cap = cv2.VideoCapture(str(video_path))
+            if cap.isOpened():
+                cap.set(cv2.CAP_PROP_POS_MSEC, float(seg) * 1000.0)
+                ret, frame = cap.read()
+                cap.release()
+                if ret and frame is not None:
+                    return frame
+    except Exception:
+        pass
+
+    try:
+        ffmpeg_bin = os.environ.get("FFMPEG_PATH", "ffmpeg")
+        cmd = [
+            ffmpeg_bin,
+            '-hide_banner', '-loglevel', 'error',
+            '-ss', str(seg),
+            '-i', str(video_path),
+            '-vframes', '1',
+            '-f', 'image2pipe',
+            '-vcodec', 'png',
+            'pipe:1'
+        ]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        raw, _ = proc.communicate(timeout=6)
+        if raw:
+            arr = np.frombuffer(raw, dtype=np.uint8)
+            frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+            if frame is not None:
+                return frame
+    except Exception:
+        pass
+    return None
+
+
+def classificar_modo_hud(frame):
+    """
+    Classifica se um frame de gameplay de Valorant é de modo 5v5
+    (Competitivo / Sem Classificação) ou de Mata-Mata (Deathmatch / TDM).
+    
+    Critérios Visuais em 1080p:
+    1. Caixinha de Placar Individual de Mata-Mata (X: 875 a 905, Y: 22 a 48):
+       - No Mata-Mata: Existe um bloco preto opaco (< 25) colado ao timer contendo o score
+         individual do jogador, e NUNCA há a placa clara de placar de time do 5v5.
+    2. Barra de Habilidades (X: 860 a 1040, Y: 960 a 1045):
+       - No 5v5: O HUD de habilidades (C, Q, E, X e Ultimate) está sempre presente acima da vida.
+       - No Mata-Mata (FFA): As habilidades são 100% desativadas e removidas da interface.
+    """
+    if frame is None:
+        return 'UNKNOWN'
+    h, w = frame.shape[:2]
+    if (w, h) != (1920, 1080):
+        frame = cv2.resize(frame, (1920, 1080), interpolation=cv2.INTER_LINEAR)
+
+    # 1. Checa a caixinha preta do score individual de Deathmatch colada ao cronômetro:
+    box_l = frame[22:48, 875:905]
+    gray_box_l = cv2.cvtColor(box_l, cv2.COLOR_BGR2GRAY)
+    pure_black_ratio = np.count_nonzero(gray_box_l < 25) / gray_box_l.size
+
+    # 2. Checa as habilidades no rodapé (desativadas no Deathmatch):
+    abilities_roi = frame[960:1045, 860:1040]
+    gray_ab = cv2.cvtColor(abilities_roi, cv2.COLOR_BGR2GRAY)
+    keybinds_roi = gray_ab[65:85, :]
+    keybind_white = np.count_nonzero(keybinds_roi > 170)
+    
+    ult_roi = gray_ab[45:85, 110:175]
+    ult_edges = cv2.Canny(ult_roi, 40, 120)
+    ult_edge_count = np.count_nonzero(ult_edges)
+
+    # No Deathmatch:
+    # - Há a caixinha preta individual colada ao timer (pure_black_ratio > 0.40)
+    # - E NÃO há keybinds de habilidades nem anel de ultimate (keybind_white < 20 ou ult_edge_count < 180)
+    is_deathmatch = (pure_black_ratio > 0.40) and (keybind_white < 20 or ult_edge_count < 180)
+
+    return 'MATA_MATA' if is_deathmatch else 'COMPETITIVE_OR_UNRATED'
+
+
+def agrupar_highlights(tempos_kills, janela_seg=40, min_kills=3, pre_margin=4.0, post_margin=3.5,
+                       video_path=None, filter_deathmatch=True, debug=False):
     """
     Agrupa abates ocorridos dentro da mesma rodada (~40s) em clipes épicos:
     - 3 abates: 3K
     - 4 abates: 4K
     - 5+ abates: ACE
+    
+    Aplica regra de validação de modo de jogo:
+    - Descarta automaticamente clipes de Mata-Mata (Deathmatch / TDM).
+    - Permite apenas partidas Sem Classificação (Unrated) ou Competitivas (Ranked).
     """
     if len(tempos_kills) < min_kills:
         return []
@@ -313,23 +504,55 @@ def agrupar_highlights(tempos_kills, janela_seg=40, min_kills=3, pre_margin=4.0,
     resultados = []
     for idx, c in enumerate(clusters):
         count = len(c)
+        
+        # 1. Regra de Cadência anti Mata-Mata:
+        # No 5v5 existem apenas 5 adversários no time inimigo.
+        # Mesmo com Ressurreição da Sage, o teto físico é 6 kills por round.
+        # Se um cluster tiver 7+ kills em uma única sequência, é 100% mata-mata (respawns contínuos).
+        if filter_deathmatch and count > 6:
+            if debug:
+                print(f"[FILTRO MATA-MATA] Cluster descartado: {count} kills em {c[0]}s (excede limite de 5v5)", file=sys.stderr)
+            continue
+
+        inicio = max(0.0, round(c[0] - pre_margin, 2))
+        fim = round(c[-1] + post_margin, 2)
+        duracao = round(fim - inicio, 2)
+
+        # 2. Validação Visual de HUD do Modo de Jogo por Consenso Multi-Amostras:
+        if filter_deathmatch and video_path:
+            sample_offsets = [inicio + 1.5, c[0], c[-1]]
+            dm_votes = 0
+            valid_samples = 0
+            for s_time in sample_offsets:
+                sample_t = max(0.0, float(s_time))
+                frame_sample = extrair_frame_em_segundo(video_path, sample_t)
+                if frame_sample is not None:
+                    valid_samples += 1
+                    if classificar_modo_hud(frame_sample) == 'MATA_MATA':
+                        dm_votes += 1
+            
+            # Descarta apenas se a maioria das amostras confirmar Mata-Mata
+            if valid_samples > 0 and dm_votes >= ((valid_samples // 2) + 1):
+                if debug:
+                    print(f"[FILTRO MATA-MATA] Corte em {inicio}s-{fim}s descartado: HUD identificado como Mata-Mata ({dm_votes}/{valid_samples} frames).", file=sys.stderr)
+                continue
+
         tipo = "3K"
         if count == 4:
             tipo = "4K"
         elif count >= 5:
             tipo = "ACE"
 
-        inicio = max(0.0, round(c[0] - pre_margin, 2))
-        fim = round(c[-1] + post_margin, 2)
-        duracao = round(fim - inicio, 2)
-
         resultados.append({
-            "id": f"val_cut_{idx + 1}_{tipo.lower()}_{int(inicio)}s",
+            "id": f"val_cut_{len(resultados) + 1}_{tipo.lower()}_{int(inicio)}s",
             "tipo": tipo,
             "inicio_seg": inicio,
             "fim_seg": fim,
             "duracao": duracao,
             "tempos_kills_seg": c,
+            "modo": "COMPETITIVO_OU_SEM_CLASS",
+            "game_mode": "COMPETITIVE_OR_UNRATED",
+            "is_competitive_or_unrated": True,
         })
 
     return resultados
@@ -341,7 +564,10 @@ def main():
     parser.add_argument("--template", default="public/templates/meu_kill_template.png", help="Caminho do template do nickname")
     parser.add_argument("--player-nick", default="Revenge", help="Nickname do jogador no Valorant")
     parser.add_argument("--limiar", type=float, default=LIMIAR_FULL_PADRAO, help="Limiar de correlação para card completo")
+    parser.add_argument("--start-seconds", type=float, default=0.0, help="Segundo inicial para começar a escanear")
     parser.add_argument("--max-seconds", type=float, default=None, help="Limite máximo de segundos para escanear")
+    parser.add_argument("--filter-deathmatch", action="store_true", default=True, help="Filtra e descarta clipes de Mata-Mata")
+    parser.add_argument("--no-filter-deathmatch", dest="filter_deathmatch", action="store_false", help="Desativa o filtro de Mata-Mata")
     parser.add_argument("--debug", action="store_true", help="Ativa logs detalhados na saída de erro")
 
     args = parser.parse_args()
@@ -351,7 +577,9 @@ def main():
         template_path=args.template,
         player_nick=args.player_nick,
         limiar_full=args.limiar,
+        start_seconds=args.start_seconds,
         max_seconds=args.max_seconds,
+        filter_deathmatch=args.filter_deathmatch,
         debug=args.debug
     )
 

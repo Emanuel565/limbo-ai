@@ -4,7 +4,12 @@ import path from 'node:path';
 import { validateRenderRequest } from '../validators.js';
 import { processValorantVodShorts } from '@/tools/gerador_shorts.js';
 import { schedulePost, getNextOptimalSlot } from '@/tools/post-scheduler.js';
-import { generateViralHookTitle, generateSocialMediaCaption, evaluateViralScore } from '@/tools/social-media-agent.js';
+import { 
+    generateViralHookTitle, 
+    generateSocialMediaCaption, 
+    evaluateViralScore, 
+    auditCutWithSocialMediaAI 
+} from '@/tools/social-media-agent.js';
 
 export async function POST(req: NextRequest) {
     try {
@@ -14,6 +19,27 @@ export async function POST(req: NextRequest) {
         if (!validation.valid) {
             return NextResponse.json(
                 { success: false, error: validation.error },
+                { status: 400 }
+            );
+        }
+
+        const playerNick = String(body?.playerNick || 'Revenge').trim();
+
+        // 🛡️ Regra Estrita: Apenas cortes avaliados e APROVADOS pelo Social Media IA podem ser renderizados
+        const approvedCuts = (validation.cuts || []).filter((cut: any) => {
+            if (cut.aiApproval) {
+                return cut.aiApproval.status === 'APPROVED';
+            }
+            const audit = (auditCutWithSocialMediaAI as any)({ cut, playerNick });
+            return audit.status === 'APPROVED';
+        });
+
+        if (approvedCuts.length === 0) {
+            return NextResponse.json(
+                { 
+                    success: false, 
+                    error: 'Nenhum corte aprovado pelo Social Media IA para renderização. Apenas jogadas aprovadas (5v5 Sem Class / Comp de alto potencial viral) têm permissão para renderização.' 
+                },
                 { status: 400 }
             );
         }
@@ -35,16 +61,16 @@ export async function POST(req: NextRequest) {
         }
 
         const result = await processValorantVodShorts(renderSource, {
-            cuts: validation.cuts,
+            cuts: approvedCuts,
             outputDir,
             useNvenc: true,
         });
 
         // Integra os cortes prontos diretamente à fila de agendamento de postagens (apenas os que realmente renderizaram)
         const scheduledPosts = [];
-        const playerNick = String(body?.playerNick || 'Revenge').trim();
-        for (let idx = 0; idx < (result.cuts || validation.cuts || []).length; idx++) {
-            const cut = (result.cuts || validation.cuts)[idx];
+        const cutsList: any[] = (result.cuts || validation.cuts || []);
+        for (let idx = 0; idx < cutsList.length; idx++) {
+            const cut: any = cutsList[idx];
             const cutId = cut.id || `val_cut_${cut.clipType || 'highlight'}_${Math.round(cut.startSec || 0)}s`;
             const videoFileName = `${cutId}.mp4`;
             const videoFullPath = cut.renderedPath || path.join(outputDir, videoFileName);

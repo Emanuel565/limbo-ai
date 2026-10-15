@@ -7,6 +7,9 @@ import {
     processDuePosts,
     getNextOptimalSlot,
     updatePostApproval,
+    publishPostById,
+    groupPostsByWeek,
+    cleanupPublishedVideos,
 } from "@/tools/post-scheduler.js";
 
 export const dynamic = "force-dynamic";
@@ -14,22 +17,22 @@ export const revalidate = 0;
 
 export async function GET() {
     try {
-        // Tenta processar qualquer post agendado que já atingiu o horário
-        const processResult = await processDuePosts().catch((err) => {
-            console.error("Erro no processDuePosts:", err);
-            return null;
+        // Processa posts agendados vencidos em background sem travar a resposta imediata da UI
+        processDuePosts().catch((err) => {
+            console.error("Erro no background processDuePosts:", err);
         });
 
         const queue = readScheduleQueue();
         const nextSlot = getNextOptimalSlot();
+        const groupedWeeks = groupPostsByWeek(queue);
 
         return NextResponse.json(
             {
                 ok: true,
                 queue,
                 posts: queue,
+                groupedWeeks,
                 nextOptimalSlot: nextSlot,
-                processResult,
             },
             {
                 headers: {
@@ -48,11 +51,37 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
+
+        // Ação de limpeza de disco SSD solicitada pelo usuário
+        if (body?.action === "cleanup_disk") {
+            const cleanRes = cleanupPublishedVideos({
+                cleanOrphaned: body?.cleanOrphaned ?? true,
+            });
+            return NextResponse.json({
+                ...cleanRes,
+                message: `SSD liberado: ${cleanRes.freedMb} MB economizados (${cleanRes.filesDeleted.length} arquivos limpos). Todos os posts continuam salvos no banco de dados!`,
+            });
+        }
+
+        // Disparo imediato manual ("Publicar Agora")
+        if (body?.action === "publish_now") {
+            const id = String(body?.id || "");
+            if (!id) {
+                return NextResponse.json({ ok: false, error: "ID do post é obrigatório para publicação imediata." }, { status: 400 });
+            }
+            const publishRes = await publishPostById(id);
+            return NextResponse.json({
+                ok: publishRes.ok,
+                message: publishRes.ok ? "Publicação realizada nas redes com sucesso!" : "Falha na publicação.",
+                result: publishRes,
+            });
+        }
+
         const title = String(body?.title || "").trim();
         const description = String(body?.description || "").trim();
         const videoUrl = String(body?.videoUrl || "").trim();
         const videoPath = body?.videoPath ? String(body.videoPath) : undefined;
-        const platforms = Array.isArray(body?.platforms) ? body.platforms : ["tiktok", "instagram"];
+        const platforms = Array.isArray(body?.platforms) ? body.platforms : ["tiktok", "instagram", "youtube"];
         const useNextOptimal = Boolean(body?.useNextOptimal ?? true);
         const scheduledFor = body?.scheduledFor ? String(body.scheduledFor) : undefined;
         const deleteAfterPublish = Boolean(body?.deleteAfterPublish ?? true);

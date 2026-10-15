@@ -8,6 +8,7 @@ export function aggregateKillHighlights(killTimestamps, {
     minKills = 3,
     preMarginSec = 4,
     postMarginSec = 3,
+    filterDeathmatch = true,
 } = {}) {
     if (!Array.isArray(killTimestamps) || killTimestamps.length === 0) {
         return [];
@@ -47,8 +48,14 @@ export function aggregateKillHighlights(killTimestamps, {
         clusters.push(currentCluster);
     }
 
-    // 2. Transforma cada cluster em objeto de highlight formatado
-    return clusters.map((kills, index) => {
+    // 2. Filtra mata-mata: no 5v5 (Sem Classificação e Competitivo) há no máximo 5 inimigos (6 com Sage ult).
+    // Qualquer sequência contínua com 7+ kills pertence a mata-mata (respawns instantâneos).
+    const validClusters = filterDeathmatch
+        ? clusters.filter((kills) => kills.length <= 6)
+        : clusters;
+
+    // 3. Transforma cada cluster em objeto de highlight formatado
+    return validClusters.map((kills, index) => {
         const firstKill = kills[0];
         const lastKill = kills[kills.length - 1];
         const count = kills.length;
@@ -69,6 +76,8 @@ export function aggregateKillHighlights(killTimestamps, {
             endSec,
             duration,
             killTimes: kills,
+            gameMode: 'COMPETITIVE_OR_UNRATED',
+            isCompetitiveOrUnrated: true,
             headline: clipType === 'ACE' ? 'ACE HISTÓRICO NO VALORANT 👑' : `${clipType} INSANO NO ROUND 🔥`,
         };
     });

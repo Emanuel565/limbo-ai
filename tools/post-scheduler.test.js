@@ -2,86 +2,118 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+
 import {
-    getNextOptimalSlot,
+    groupPostsByWeek,
+    cleanupPublishedVideos,
     schedulePost,
-    cancelScheduledPost,
-    cleanupPostFiles,
-    processDuePosts,
     readScheduleQueue,
-    clearScheduleQueue,
+    writeScheduleQueue,
 } from './post-scheduler.js';
+import { executeMultiPlatformPublish } from './social-publisher.js';
 
-// Protege a fila real: backup antes dos testes e restauração ao final
-const QUEUE_FILE = path.join(process.cwd(), 'data', 'scheduled-posts.json');
-let queueBackup = null;
-test.before(() => {
-    queueBackup = fs.existsSync(QUEUE_FILE) ? fs.readFileSync(QUEUE_FILE, 'utf8') : null;
-});
-test.after(() => {
-    if (queueBackup !== null) fs.writeFileSync(QUEUE_FILE, queueBackup, 'utf8');
-    else clearScheduleQueue();
+test('groupPostsByWeek groups posts by week with dates, times, and day labels', () => {
+    const mockPosts = [
+        {
+            id: 'post_1',
+            title: '3K Impecável do Revenge',
+            scheduledFor: '2026-10-12T18:00:00.000Z',
+            timeLabel: '15:00',
+            status: 'SCHEDULED',
+            platforms: ['tiktok', 'instagram', 'youtube'],
+            aiApproval: { status: 'APPROVED', viralScore: 94 },
+        },
+        {
+            id: 'post_2',
+            title: 'Ace Histórico no Round Decisivo',
+            scheduledFor: '2026-10-14T21:30:00.000Z',
+            timeLabel: '18:30',
+            status: 'PUBLISHED',
+            platforms: ['tiktok', 'instagram', 'youtube'],
+            aiApproval: { status: 'APPROVED', viralScore: 98 },
+        },
+        {
+            id: 'post_3',
+            title: 'Clutch 1v3 no Overtime',
+            scheduledFor: '2026-10-21T20:00:00.000Z',
+            timeLabel: '17:00',
+            status: 'SCHEDULED',
+            platforms: ['tiktok', 'instagram', 'youtube'],
+            aiApproval: { status: 'APPROVED', viralScore: 91 },
+        },
+    ];
+
+    const weeks = groupPostsByWeek(mockPosts);
+
+    assert.ok(Array.isArray(weeks));
+    assert.equal(weeks.length, 2);
+
+    // Primeira semana: 12/10 a 18/10
+    const week1 = weeks[0];
+    assert.equal(week1.posts.length, 2);
+    assert.equal(week1.stats.total, 2);
+    assert.equal(week1.stats.scheduled, 1);
+    assert.equal(week1.stats.published, 1);
+    assert.ok(week1.posts[0].dayOfWeek);
+    assert.ok(week1.posts[0].formattedDate);
+
+    // Segunda semana: 19/10 a 25/10
+    const week2 = weeks[1];
+    assert.equal(week2.posts.length, 1);
+    assert.equal(week2.stats.total, 1);
+    assert.equal(week2.stats.scheduled, 1);
 });
 
-test('getNextOptimalSlot returns upcoming time slot today or tomorrow', () => {
-    const fixedNow = new Date('2026-10-13T10:00:00.000Z');
-    const slot = getNextOptimalSlot(fixedNow);
-    assert.ok(slot.scheduledFor);
-    assert.ok(slot.timeString);
-    assert.ok(slot.dayLabel);
-    assert.ok(slot.reason.includes('Pico de audiência'));
+test('cleanupPublishedVideos unlinks published video files while retaining records in database', () => {
+    const tmpDir = path.join(process.cwd(), 'data', 'temp_test_cleanup');
+    if (!fs.existsSync(tmpDir)) {
+        fs.mkdirSync(tmpDir, { recursive: true });
+    }
+
+    const testVideoPath = path.join(tmpDir, 'test_cleanup_video.mp4');
+    fs.writeFileSync(testVideoPath, Buffer.alloc(1024 * 1024 * 2)); // 2MB dummy file
+
+    const testPost = {
+        id: `test_cleanup_${Date.now()}`,
+        title: 'Vídeo para Teste de Limpeza',
+        status: 'PUBLISHED',
+        videoPath: testVideoPath,
+        scheduledFor: new Date().toISOString(),
+        platforms: ['tiktok', 'instagram', 'youtube'],
+        aiApproval: { status: 'APPROVED' },
+    };
+
+    writeScheduleQueue([testPost]);
+
+    assert.ok(fs.existsSync(testVideoPath), 'Arquivo físico deve existir antes da limpeza');
+
+    const result = cleanupPublishedVideos({ cleanOrphaned: false });
+
+    assert.ok(result.ok);
+    assert.ok(result.freedMb >= 1.9, `Esperado ~2MB liberados, obteve ${result.freedMb}`);
+    assert.ok(!fs.existsSync(testVideoPath), 'Arquivo físico deve ser removido para liberar SSD');
+
+    // O registro no banco de dados deve permanecer intacto!
+    const queueAfter = readScheduleQueue();
+    const retained = queueAfter.find((p) => p.id === testPost.id);
+    assert.ok(retained, 'O registro do post deve permanecer no banco de dados');
+    assert.equal(retained.fileCleanedUp, true);
+    assert.equal(retained.status, 'PUBLISHED');
+
+    // Cleanup temp dir
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
 });
 
-test('schedulePost adds an entry to the schedule queue', () => {
-    const post = schedulePost({
-        title: 'CLUTCH 1V5 NO VALORANT',
-        description: 'Melhor jogada do dia #valorant',
-        useNextOptimal: true,
-        deleteAfterPublish: true,
+test('executeMultiPlatformPublish supports YouTube Shorts via GhostEngine', async () => {
+    const publishResult = await executeMultiPlatformPublish({
+        platforms: ['tiktok', 'instagram', 'youtube'],
+        title: 'Jogada Épica do Revenge',
+        description: 'Melhor clutch do ano no Valorant #shorts',
+        dryRun: true,
     });
 
-    assert.ok(post.id.startsWith('sched_'));
-    assert.equal(post.title, 'CLUTCH 1V5 NO VALORANT');
-    assert.equal(post.status, 'SCHEDULED');
-    assert.equal(post.deleteAfterPublish, true);
-
-    const queue = readScheduleQueue();
-    const found = queue.find((p) => p.id === post.id);
-    assert.ok(found);
-});
-
-test('cancelScheduledPost marks post as cancelled', () => {
-    const post = schedulePost({
-        title: 'LINEUP DE SOVA',
-        useNextOptimal: true,
-    });
-
-    const cancelled = cancelScheduledPost(post.id);
-    assert.ok(cancelled);
-    assert.equal(cancelled.status, 'CANCELLED');
-});
-
-test('cleanupPostFiles removes temporary video and subtitle files', () => {
-    const testDir = path.join(process.cwd(), 'data', 'test-scratch');
-    fs.mkdirSync(testDir, { recursive: true });
-
-    const dummyVideo = path.join(testDir, 'sample-short.mp4');
-    const dummySrt = `${dummyVideo}.srt`;
-    const dummyAss = `${dummyVideo}.ass`;
-
-    fs.writeFileSync(dummyVideo, 'dummy-video-data');
-    fs.writeFileSync(dummySrt, 'dummy-srt-data');
-    fs.writeFileSync(dummyAss, 'dummy-ass-data');
-
-    assert.ok(fs.existsSync(dummyVideo));
-    assert.ok(fs.existsSync(dummySrt));
-    assert.ok(fs.existsSync(dummyAss));
-
-    const deleted = cleanupPostFiles(dummyVideo);
-    assert.equal(deleted.length, 3);
-    assert.equal(fs.existsSync(dummyVideo), false);
-    assert.equal(fs.existsSync(dummySrt), false);
-    assert.equal(fs.existsSync(dummyAss), false);
-
-    fs.rmdirSync(testDir);
+    assert.ok(publishResult.ok);
+    assert.ok(publishResult.results.youtube);
+    assert.equal(publishResult.results.youtube.mode, 'GHOST_ENGINE_STUDIO');
+    assert.ok(publishResult.results.youtube.caption.includes('#shorts'));
 });

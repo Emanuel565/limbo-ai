@@ -45,12 +45,13 @@ export async function POST(request: Request) {
         const execution = await executeMultiPlatformPublish({
             platforms: targetPlatforms,
             videoUrl: videoUrl || "http://localhost:3000/generated/short-viral.mp4",
+            videoPath: body?.videoPath || "",
             title,
             description,
             tiktokHandle,
             instagramHandle,
             dryRun: isDryRun,
-        });
+        } as any);
 
         const platformLabels = targetPlatforms.map((p) => {
             if (p === "tiktok") return "TikTok";

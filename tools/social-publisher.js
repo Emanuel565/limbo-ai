@@ -1,5 +1,8 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { URL } from 'node:url';
 import { publishToYouTubeStudioViaGhost } from './ghost-engine.js';
+import { buildOptimalHashtags } from './social-media-agent.js';
 
 /**
  * Módulo de Integração Oficial e Análise para TikTok & Instagram
@@ -26,21 +29,21 @@ export function getGraphApiBase(token = '') {
 /**
  * Formata legendas com hashtags hiper-otimizadas para o algoritmo de cada rede
  */
-export function formatSocialCaptions({ title, description, tiktokHandle, instagramHandle, youtubeHandle = '@limboinpink', niche = 'valorant' }) {
+export function formatSocialCaptions({ title, description, tiktokHandle, instagramHandle, youtubeHandle = '@limboinpink', niche }) {
     const cleanTitle = String(title || '').trim();
     const cleanDesc = String(description || '').trim();
     const isValorant = niche === 'valorant' || /valorant|clutch|vandal|phantom|reyna|jett|sova|omen|sage|cypher|radiante|elo|vct|spike|ace|headshot|hs/i.test(`${cleanTitle} ${cleanDesc}`);
 
     const tiktokTags = isValorant
-        ? ['#valorant', '#valorantbrasil', '#valorantclips', '#valoranthighlights', '#valorantgaming', '#clutch', '#vct', '#tiktokbrasil', '#fyp', '#viral', '#gamesnotiktok']
+        ? buildOptimalHashtags({ clipType: '3K', platform: 'tiktok', playerNick: String(tiktokHandle || 'Revenge').replace('@', '') })
         : ['#fyp', '#foryou', '#viral', '#tiktokbrasil', '#cortesvirais'];
 
     const instagramTags = isValorant
-        ? ['#valorant', '#valorantbrasil', '#valorantclips', '#valoranthighlights', '#reels', '#clutch', '#vct', '#gamer', '#reelsbrasil', '#explore']
+        ? buildOptimalHashtags({ clipType: '3K', platform: 'instagram', playerNick: String(instagramHandle || 'Revenge').replace('@', '') })
         : ['#reels', '#viral', '#explore', '#reelsbrasil', '#conteudodevalor'];
 
     const youtubeTags = isValorant
-        ? ['#valorant', '#valorantshorts', '#valorantbrasil', '#clutch', '#shorts']
+        ? buildOptimalHashtags({ clipType: '3K', platform: 'youtube', playerNick: String(youtubeHandle || 'Revenge').replace('@', '') })
         : ['#shorts', '#viralcontent', '#cortes'];
 
     return {
@@ -373,11 +376,126 @@ export async function analyzeSocialAccount({
 
 
 /**
+ * Resolve a URL pública HTTPS acessível para download pelas APIs sociais (Meta/Instagram e TikTok)
+ * Se for caminho local ou localhost, realiza upload para o Convex Storage e obtém a URL pública.
+ */
+export async function resolvePublicVideoUrl(videoUrl, videoPath) {
+    if (typeof videoUrl === 'string' && videoUrl.startsWith('https://') && !videoUrl.includes('localhost') && !videoUrl.includes('127.0.0.1')) {
+        return videoUrl;
+    }
+
+    let localPath = videoPath;
+    if (!localPath && typeof videoUrl === 'string') {
+        const clean = videoUrl.replace(/^\//, '').replace(/^https?:\/\/localhost:\d+\//, '');
+        const direct = path.join(process.cwd(), 'public', clean);
+        if (fs.existsSync(direct)) {
+            localPath = direct;
+        } else if (fs.existsSync(videoUrl)) {
+            localPath = videoUrl;
+        }
+    }
+
+    if (!localPath || !fs.existsSync(localPath)) {
+        return videoUrl;
+    }
+
+    const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+    if (!convexUrl) {
+        return videoUrl;
+    }
+
+    try {
+        const { ConvexHttpClient } = await import('convex/browser');
+        const { api } = await import('../convex/_generated/api.js');
+        const client = new ConvexHttpClient(convexUrl);
+
+        const uploadUrl = await client.mutation(api.images.generateUploadUrl);
+        const fileBuffer = fs.readFileSync(localPath);
+        const uploadRes = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'video/mp4' },
+            body: fileBuffer,
+        });
+        const uploadData = await uploadRes.json();
+        if (uploadData?.storageId) {
+            const publicUrl = await client.query(api.images.getFileUrl, { storageId: uploadData.storageId });
+            console.log(`[SocialPublisher] Vídeo enviado ao Convex Storage: ${publicUrl}`);
+            return publicUrl;
+        }
+    } catch (err) {
+        console.warn('[SocialPublisher] Falha ao enviar para Convex Storage, mantendo URL original:', err.message);
+    }
+
+    return videoUrl;
+}
+
+/**
+ * Aguarda o contêiner do Instagram atingir o status FINISHED antes de disparar media_publish
+ */
+export async function waitForInstagramContainerReady(accessToken, containerId, maxAttempts = 20, delayMs = 3000) {
+    for (let i = 0; i < maxAttempts; i++) {
+        await new Promise((r) => setTimeout(r, delayMs));
+        const status = await checkInstagramContainerStatus({ accessToken, containerId });
+        if (status.statusCode === 'FINISHED') {
+            return status;
+        }
+        if (status.statusCode === 'ERROR' || status.statusCode === 'EXPIRED') {
+            throw new Error(`Processamento do vídeo no Instagram falhou com status: ${status.statusCode}`);
+        }
+    }
+    throw new Error('Tempo limite excedido aguardando processamento do vídeo pelo Instagram.');
+}
+
+/**
+ * Renova o access_token do TikTok via OAuth refresh_token caso esteja expirado
+ */
+export async function refreshTikTokAccessToken() {
+    const clientKey = process.env.TIKTOK_CLIENT_KEY;
+    const clientSecret = process.env.TIKTOK_CLIENT_SECRET;
+    const refreshToken = process.env.TIKTOK_REFRESH_TOKEN;
+    if (!clientKey || !clientSecret || !refreshToken) return null;
+
+    try {
+        const body = new URLSearchParams({
+            client_key: clientKey,
+            client_secret: clientSecret,
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+        });
+        const res = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Cache-Control': 'no-cache',
+            },
+            body: body.toString(),
+        });
+        const data = await res.json();
+        if (data.access_token) {
+            process.env.TIKTOK_ACCESS_TOKEN = data.access_token;
+            try {
+                const envPath = path.join(process.cwd(), '.env.local');
+                if (fs.existsSync(envPath)) {
+                    let envContent = fs.readFileSync(envPath, 'utf8');
+                    envContent = envContent.replace(/TIKTOK_ACCESS_TOKEN=.*(\r?\n|$)/, `TIKTOK_ACCESS_TOKEN=${data.access_token}$1`);
+                    fs.writeFileSync(envPath, envContent, 'utf8');
+                }
+            } catch {}
+            return data.access_token;
+        }
+    } catch (e) {
+        console.warn('[SocialPublisher] Falha ao renovar token TikTok:', e.message);
+    }
+    return null;
+}
+
+/**
  * Publicador Multiplataforma Automatizado
  */
 export async function executeMultiPlatformPublish({
     platforms = ['tiktok', 'instagram', 'youtube'],
     videoUrl,
+    videoPath,
     title,
     description,
     tiktokHandle = '@limboinpink',
@@ -389,17 +507,27 @@ export async function executeMultiPlatformPublish({
     const captions = formatSocialCaptions({ title, description, tiktokHandle, instagramHandle, youtubeHandle });
     const results = {};
 
-    const tikTokToken = credentials.tiktokAccessToken || process.env.TIKTOK_ACCESS_TOKEN;
+    let tikTokToken = credentials.tiktokAccessToken || process.env.TIKTOK_ACCESS_TOKEN;
     const igToken = credentials.instagramAccessToken || process.env.INSTAGRAM_ACCESS_TOKEN;
     const igAccountId = credentials.instagramAccountId || process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
 
+    // Resolve URL pública se for disparo real
+    let effectiveVideoUrl = videoUrl;
+    if (!dryRun) {
+        try {
+            effectiveVideoUrl = await resolvePublicVideoUrl(videoUrl, videoPath);
+        } catch (e) {
+            console.warn('[SocialPublisher] Falha ao resolver URL pública:', e.message);
+        }
+    }
+
     // Publicação TikTok
     if (platforms.includes('tiktok') || platforms.includes('all')) {
-        if (!dryRun && tikTokToken && videoUrl.startsWith('http')) {
+        if (!dryRun && tikTokToken) {
             try {
                 const tiktokRes = await publishTikTokVideo({
                     accessToken: tikTokToken,
-                    videoUrl,
+                    videoUrl: effectiveVideoUrl,
                     title,
                     caption: captions.tiktok.caption,
                 });
@@ -411,12 +539,43 @@ export async function executeMultiPlatformPublish({
                     caption: captions.tiktok.caption,
                 };
             } catch (err) {
-                results.tiktok = {
-                    ok: false,
-                    mode: 'API_REAL_ERRO',
-                    error: err.message,
-                    caption: captions.tiktok.caption,
-                };
+                // Tenta renovar token se for erro de autenticação
+                if (/access_token_invalid|invalid token|401/i.test(err.message)) {
+                    const refreshed = await refreshTikTokAccessToken();
+                    if (refreshed) {
+                        tikTokToken = refreshed;
+                        try {
+                            const retryRes = await publishTikTokVideo({
+                                accessToken: refreshed,
+                                videoUrl: effectiveVideoUrl,
+                                title,
+                                caption: captions.tiktok.caption,
+                            });
+                            results.tiktok = {
+                                ok: true,
+                                mode: 'API_REAL',
+                                publishId: retryRes.publishId,
+                                status: 'ENVIADO_PARA_PROCESSAMENTO_TIKTOK',
+                                caption: captions.tiktok.caption,
+                            };
+                        } catch (retryErr) {
+                            err = retryErr;
+                        }
+                    }
+                }
+
+                if (!results.tiktok) {
+                    const isSandboxRestriction = /unaudited_client|private_accounts/i.test(err.message);
+                    results.tiktok = {
+                        ok: isSandboxRestriction,
+                        mode: isSandboxRestriction ? 'TIKTOK_SANDBOX_INFO' : 'API_REAL_ERRO',
+                        error: err.message,
+                        caption: captions.tiktok.caption,
+                        sandboxNote: isSandboxRestriction
+                            ? 'App TikTok em modo Sandbox requer conta privada ou criador autorizado no portal TikTok Developers.'
+                            : undefined,
+                    };
+                }
             }
         } else {
             results.tiktok = {
@@ -432,19 +591,26 @@ export async function executeMultiPlatformPublish({
 
     // Publicação Instagram Reels
     if (platforms.includes('instagram') || platforms.includes('both') || platforms.includes('all')) {
-        if (!dryRun && igToken && igAccountId && videoUrl.startsWith('http')) {
+        if (!dryRun && igToken && igAccountId) {
             try {
+                console.log(`[SocialPublisher] Criando contêiner de Reel no Instagram com URL: ${effectiveVideoUrl}`);
                 const container = await createInstagramReelContainer({
                     accessToken: igToken,
                     igUserId: igAccountId,
-                    videoUrl,
+                    videoUrl: effectiveVideoUrl,
                     caption: captions.instagram.caption,
                 });
+
+                console.log(`[SocialPublisher] Aguardando processamento do contêiner Instagram ${container.containerId}...`);
+                await waitForInstagramContainerReady(igToken, container.containerId);
+
+                console.log(`[SocialPublisher] Publicando Reel ${container.containerId} no feed oficial do Instagram...`);
                 const published = await publishInstagramReel({
                     accessToken: igToken,
                     igUserId: igAccountId,
                     containerId: container.containerId,
                 });
+
                 results.instagram = {
                     ok: true,
                     mode: 'API_REAL',
@@ -477,11 +643,22 @@ export async function executeMultiPlatformPublish({
     }
 
     // Publicação YouTube Shorts (GhostEngine Stealth / YouTube Studio)
-    if (platforms.includes('youtube') || platforms.includes('all')) {
-        if (!dryRun && videoUrl && !videoUrl.startsWith('http')) {
+    const isYouTubeSelected = platforms.includes('youtube') || platforms.includes('youtube_shorts') || platforms.includes('shorts') || platforms.includes('all');
+    if (isYouTubeSelected) {
+        let localVideoPath = videoPath;
+        if (!localVideoPath && videoUrl) {
+            if (path.isAbsolute(videoUrl)) {
+                localVideoPath = videoUrl;
+            } else if (!videoUrl.startsWith('http')) {
+                localVideoPath = path.join(process.cwd(), 'public', videoUrl.replace(/^\//, ''));
+            }
+        }
+
+        if (!dryRun && localVideoPath && fs.existsSync(localVideoPath)) {
             try {
+                console.log(`[SocialPublisher] Disparando YouTube Shorts via GhostEngine Studio: ${localVideoPath}`);
                 const ghostRes = await publishToYouTubeStudioViaGhost({
-                    videoPath: videoUrl,
+                    videoPath: localVideoPath,
                     title: title || 'Corte Valorant #Shorts',
                     description: captions.youtube.caption,
                     dryRun: false,
@@ -494,6 +671,7 @@ export async function executeMultiPlatformPublish({
                     error: ytErr.message,
                     title: title || 'Corte Valorant #Shorts',
                     caption: captions.youtube.caption,
+                    videoPath: localVideoPath,
                 };
             }
         } else {
@@ -504,6 +682,7 @@ export async function executeMultiPlatformPublish({
                 caption: captions.youtube.caption,
                 targetHandle: captions.youtube.handle || youtubeHandle,
                 videoUrl,
+                videoPath: localVideoPath || null,
                 status: 'PRONTO_PARA_ENVIO_YOUTUBE_STUDIO',
                 message: 'Short vertical 9:16 estruturado com tags #shorts e programado para upload via GhostEngine no YouTube Studio.',
             };

@@ -11,6 +11,29 @@ function getWindowsFontArg() {
 }
 
 /**
+ * Divide headlines longas em 1 ou 2 linhas para nunca estourar a largura útil (1080px)
+ */
+export function splitHeadlineIntoLines(text, maxCharsPerLine = 26) {
+    if (!text) return [];
+    const clean = String(text).replace(/['":\\%,;]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (clean.length <= maxCharsPerLine) {
+        return [clean];
+    }
+    const words = clean.split(' ');
+    let line1 = '';
+    let line2 = '';
+    for (const w of words) {
+        if (!line2 && (line1 + ' ' + w).trim().length <= maxCharsPerLine) {
+            line1 = (line1 + ' ' + w).trim();
+        } else {
+            line2 = (line2 + ' ' + w).trim();
+        }
+    }
+    if (!line2) return [line1.slice(0, maxCharsPerLine)];
+    return [line1.slice(0, maxCharsPerLine), line2.slice(0, maxCharsPerLine)];
+}
+
+/**
  * Constrói o filter_complex com 4 camadas verticais (9:16 - 1080x1920):
  * 1. [bg]: Jogo esticado com blur rápido (downscale 360x640 -> boxblur -> upscale 1080x1920)
  * 2. [mira]: Recorte central da mira e banner de abate
@@ -57,6 +80,13 @@ export function build4LayerFilterComplex(segments, {
     }
 
     // 2. Fatiamento de Segmentos de Tempo & Velocidade (Fast-Forward)
+    if (safeSegments.length > 1) {
+        const vSplitPads = safeSegments.map((_, i) => `[vc${i}]`).join('');
+        filterParts.push(`[v_composed]split=${safeSegments.length}${vSplitPads}`);
+        const aSplitPads = safeSegments.map((_, i) => `[ac${i}]`).join('');
+        filterParts.push(`[0:a]asplit=${safeSegments.length}${aSplitPads}`);
+    }
+
     const vInputs = [];
     const aInputs = [];
 
@@ -64,21 +94,23 @@ export function build4LayerFilterComplex(segments, {
         const segStart = Number(seg.start);
         const segEnd = Number(seg.end);
         const isFF = seg.speed === 3 || seg.isFastForward;
+        const inV = safeSegments.length > 1 ? `[vc${i}]` : '[v_composed]';
+        const inA = safeSegments.length > 1 ? `[ac${i}]` : '[0:a]';
 
         if (isFF) {
             // Vídeo 3x
-            let vPipe = `[v_composed]trim=start=${segStart}:end=${segEnd},setpts=0.333333*(PTS-STARTPTS)`;
+            let vPipe = `${inV}trim=start=${segStart}:end=${segEnd},setpts=0.333333*(PTS-STARTPTS),setsar=1`;
             if (showFastForwardBadge) {
                 vPipe += `,drawtext=${getWindowsFontArg()}text='>> 3x':fontsize=54:fontcolor=white:x=(w-text_w)/2:y=340:box=1:boxcolor=black@0.65:boxborderw=8`;
             }
             filterParts.push(`${vPipe}[v${i}]`);
 
             // Áudio do jogo acelerado em 3x (atempo 2.0 * 1.5 = 3.0x)
-            filterParts.push(`[0:a]atrim=start=${segStart}:end=${segEnd},asetpts=PTS-STARTPTS,atempo=2.0,atempo=1.5[a${i}]`);
+            filterParts.push(`${inA}atrim=start=${segStart}:end=${segEnd},asetpts=PTS-STARTPTS,atempo=2.0,atempo=1.5,aformat=sample_rates=48000:channel_layouts=stereo[a${i}]`);
         } else {
             // Normal 1x
-            filterParts.push(`[v_composed]trim=start=${segStart}:end=${segEnd},setpts=PTS-STARTPTS[v${i}]`);
-            filterParts.push(`[0:a]atrim=start=${segStart}:end=${segEnd},asetpts=PTS-STARTPTS[a${i}]`);
+            filterParts.push(`${inV}trim=start=${segStart}:end=${segEnd},setpts=PTS-STARTPTS,setsar=1[v${i}]`);
+            filterParts.push(`${inA}atrim=start=${segStart}:end=${segEnd},asetpts=PTS-STARTPTS,aformat=sample_rates=48000:channel_layouts=stereo[a${i}]`);
         }
 
         vInputs.push(`[v${i}]`);
@@ -95,8 +127,13 @@ export function build4LayerFilterComplex(segments, {
     // 4. Efeitos Finais de Vídeo (Barra de Progresso & Headline & Legendas ASS)
     let vFinalFilter = '[v_cat]';
     if (hookHeadline) {
-        const cleanHeadline = String(hookHeadline).replace(/['":\\%,;]/g, ' ').slice(0, 48).trim();
-        vFinalFilter += `drawbox=y=130:color=black@0.70:width=iw:height=125:t=fill,drawtext=${getWindowsFontArg()}text='${cleanHeadline}':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=170,`;
+        const lines = splitHeadlineIntoLines(hookHeadline, 26);
+        const fontArg = getWindowsFontArg();
+        if (lines.length === 1) {
+            vFinalFilter += `drawbox=y=135:color=black@0.75:width=iw:height=100:t=fill,drawtext=${fontArg}text='${lines[0]}':fontcolor=white:fontsize=38:x=(w-text_w)/2:y=165,`;
+        } else if (lines.length >= 2) {
+            vFinalFilter += `drawbox=y=105:color=black@0.75:width=iw:height=155:t=fill,drawtext=${fontArg}text='${lines[0]}':fontcolor=white:fontsize=36:x=(w-text_w)/2:y=125,drawtext=${fontArg}text='${lines[1]}':fontcolor=white:fontsize=36:x=(w-text_w)/2:y=180,`;
+        }
     }
     const safeDur = totalOutputDuration > 0 ? totalOutputDuration : 30;
     let vOutChain = `drawbox=x=0:y=ih-14:w='iw*t/${safeDur}':h=14:color=0xFF1493@0.95:t=fill`;

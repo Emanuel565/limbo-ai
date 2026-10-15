@@ -48,4 +48,16 @@ test('aggregateKillHighlights deduplicates overlapping clusters into maximum kil
     assert.strictEqual(highlights[0].clipType, 'ACE');
     assert.strictEqual(highlights[0].startSec, 396);
     assert.strictEqual(highlights[0].endSec, 425);
+    assert.strictEqual(highlights[0].gameMode, 'COMPETITIVE_OR_UNRATED');
 });
+
+test('aggregateKillHighlights filters out continuous Mata-Mata deathmatch streaks (> 6 kills in a round)', () => {
+    // Em mata-mata os inimigos renascem a cada 3s e é comum ter 7 ou 8 abates seguidos
+    const deathmatchStreak = [500, 503, 507, 511, 516, 521, 526, 532]; // 8 kills seguidas
+    const highlights = aggregateKillHighlights(deathmatchStreak, { filterDeathmatch: true });
+    assert.strictEqual(highlights.length, 0, 'Cluster de mata-mata com 8 kills deve ser descartado');
+
+    const withoutFilter = aggregateKillHighlights(deathmatchStreak, { filterDeathmatch: false });
+    assert.strictEqual(withoutFilter.length, 1, 'Sem filtro, cluster pode ser retornado');
+});
+

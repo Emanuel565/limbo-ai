@@ -3,12 +3,12 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { aggregateKillHighlights } from './valorant-kill-cluster.js';
 import { resolvePythonBinary } from './system-env-check.js';
-import { generateViralHookTitle } from './social-media-agent.js';
+import { generateViralHookTitle, auditCutWithSocialMediaAI } from './social-media-agent.js';
 
 /**
  * Converte a saída JSON do detector em objetos de Highlights tipados
  */
-export function parseDetectorOutput(rawOutput) {
+export function parseDetectorOutput(rawOutput, { filterDeathmatch = true, playerNick = 'Revenge' } = {}) {
     if (!rawOutput) return [];
 
     let parsed;
@@ -20,25 +20,42 @@ export function parseDetectorOutput(rawOutput) {
 
     if (!Array.isArray(parsed)) return [];
 
-    return parsed.map((item, idx) => ({
-        id: item.id || `val_cut_${idx + 1}_${(item.tipo || '3k').toLowerCase()}_${Math.round(item.inicio_seg || 0)}s`,
-        clipType: item.tipo || item.clipType || '3K',
-        killsCount: Array.isArray(item.tempos_kills_seg) ? item.tempos_kills_seg.length : 3,
-        startSec: Number(item.inicio_seg ?? 0),
-        endSec: Number(item.fim_seg ?? 30),
-        duration: Number(item.duracao ?? ((item.fim_seg ?? 30) - (item.inicio_seg ?? 0))),
-        killTimes: Array.isArray(item.tempos_kills_seg) ? item.tempos_kills_seg : [],
-        headline: generateViralHookTitle({
-            playerNick: 'Revenge',
-            clipType: item.tipo,
+    const mapped = parsed.map((item, idx) => {
+        const approval = auditCutWithSocialMediaAI({ cut: item, playerNick });
+        return {
+            id: item.id || `val_cut_${idx + 1}_${(item.tipo || '3k').toLowerCase()}_${Math.round(item.inicio_seg || 0)}s`,
+            clipType: item.tipo || item.clipType || '3K',
             killsCount: Array.isArray(item.tempos_kills_seg) ? item.tempos_kills_seg.length : 3,
-            killTimes: Array.isArray(item.tempos_kills_seg) ? item.tempos_kills_seg : [],
             startSec: Number(item.inicio_seg ?? 0),
             endSec: Number(item.fim_seg ?? 30),
             duration: Number(item.duracao ?? ((item.fim_seg ?? 30) - (item.inicio_seg ?? 0))),
-            index: idx,
-        }),
-    }));
+            killTimes: Array.isArray(item.tempos_kills_seg) ? item.tempos_kills_seg : [],
+            gameMode: item.game_mode || item.modo || 'COMPETITIVE_OR_UNRATED',
+            isCompetitiveOrUnrated: item.is_competitive_or_unrated !== false,
+            aiApproval: approval,
+            viralScore: approval.viralScore,
+            isApproved: approval.status === 'APPROVED',
+            headline: generateViralHookTitle({
+                playerNick,
+                clipType: item.tipo,
+                killsCount: Array.isArray(item.tempos_kills_seg) ? item.tempos_kills_seg.length : 3,
+                killTimes: Array.isArray(item.tempos_kills_seg) ? item.tempos_kills_seg : [],
+                startSec: Number(item.inicio_seg ?? 0),
+                endSec: Number(item.fim_seg ?? 30),
+                duration: Number(item.duracao ?? ((item.fim_seg ?? 30) - (item.inicio_seg ?? 0))),
+                index: idx,
+            }),
+        };
+    });
+
+    if (filterDeathmatch) {
+        return mapped.filter((cut) => {
+            const isDm = cut.gameMode === 'MATA_MATA' || cut.gameMode === 'DEATHMATCH' || cut.killsCount > 6;
+            return !isDm;
+        });
+    }
+
+    return mapped;
 }
 
 /**
@@ -48,6 +65,7 @@ export function parseDetectorOutput(rawOutput) {
  * @param {string} [options.templatePath]
  * @param {number} [options.limiar]
  * @param {number|null} [options.maxSeconds]
+ * @param {boolean} [options.filterDeathmatch]
  * @param {boolean} [options.dryRun]
  * @param {boolean} [options.debug]
  */
@@ -55,7 +73,9 @@ export async function runKillHunterAnalysis(videoSource, {
     templatePath = path.join(process.cwd(), 'public', 'templates', 'meu_kill_template.png'),
     playerNick = 'Revenge',
     limiar = 0.76,
+    startSeconds = 0.0,
     maxSeconds = null,
+    filterDeathmatch = true,
     dryRun = false,
     debug = false,
 } = {}) {
@@ -98,8 +118,16 @@ export async function runKillHunterAnalysis(videoSource, {
             if (fs.existsSync(templatePath)) {
                 args.push('--template', templatePath);
             }
+            if (startSeconds && Number(startSeconds) > 0) {
+                args.push('--start-seconds', String(startSeconds));
+            }
             if (maxSeconds && Number(maxSeconds) > 0) {
                 args.push('--max-seconds', String(maxSeconds));
+            }
+            if (filterDeathmatch) {
+                args.push('--filter-deathmatch');
+            } else {
+                args.push('--no-filter-deathmatch');
             }
             if (debug) {
                 args.push('--debug');
@@ -110,16 +138,21 @@ export async function runKillHunterAnalysis(videoSource, {
                 stdout = proc.stdout.trim();
                 executed = true;
                 break;
+            } else if (debug || proc.status !== 0) {
+                if (proc.stderr) {
+                    console.error(`[KILL HUNTER STDERR (${py})]:`, proc.stderr);
+                }
             }
-        } catch {
-            // try next python command
+        } catch (err) {
+            if (debug) {
+                console.error(`[KILL HUNTER SPAWN ERROR (${py})]:`, err);
+            }
         }
     }
 
     if (!executed || !stdout) {
-        // Fallback gracioso: retorna lista vazia quando Python não estiver disponível no host
         return [];
     }
 
-    return parseDetectorOutput(stdout);
+    return parseDetectorOutput(stdout, { filterDeathmatch, playerNick });
 }

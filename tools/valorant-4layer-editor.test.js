@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { build4LayerFilterComplex, build4LayerFfmpegArgs } from './valorant-4layer-editor.js';
+import { build4LayerFilterComplex, build4LayerFfmpegArgs, splitHeadlineIntoLines } from './valorant-4layer-editor.js';
 
 test('build4LayerFilterComplex builds 4 distinct layers: fast-downscaled bg blur, center crosshair, minimap, killfeed', () => {
     const segments = [{ start: 0, end: 15, speed: 1, duration: 15 }];
@@ -102,3 +102,41 @@ test('build4LayerFilterComplex burns .ass subtitles when subtitle path is provid
     assert.ok(filterComplex.includes('ass='), 'Must include ass subtitle filter');
     assert.ok(filterComplex.includes('subtitles.ass'), 'Must reference subtitle file');
 });
+
+test('splitHeadlineIntoLines splits long headlines into max 2 lines under 26 characters', () => {
+    const shortText = 'MIRA CRAVADA';
+    assert.deepEqual(splitHeadlineIntoLines(shortText), ['MIRA CRAVADA']);
+
+    const longText = 'MIRA CRAVADA NO PIXEL: 3K IMPECÁVEL DO REVENGE';
+    const lines = splitHeadlineIntoLines(longText, 26);
+    assert.equal(lines.length, 2);
+    assert.ok(lines[0].length <= 26, `Line 1 (${lines[0]}) must be <= 26 chars`);
+    assert.ok(lines[1].length <= 32, `Line 2 (${lines[1]}) must fit`);
+});
+
+test('build4LayerFilterComplex renders multi-line drawtext for long hook headline without canvas overflow', () => {
+    const segments = [{ start: 0, end: 15, speed: 1, duration: 15 }];
+    const { filterComplex } = build4LayerFilterComplex(segments, {
+        hookHeadline: 'MIRA CRAVADA NO PIXEL: 3K IMPECÁVEL DO REVENGE',
+    });
+
+    // Should contain drawbox and 2 drawtext filters with centered x and distinct Y coordinates
+    assert.ok(filterComplex.includes('drawbox=y=105:color=black@0.75:width=iw:height=155'), 'Must use 2-line box');
+    assert.ok(filterComplex.includes('drawtext='), 'Must include drawtext');
+    assert.ok(filterComplex.includes('y=125'), 'Must render line 1 at y=125');
+    assert.ok(filterComplex.includes('y=180'), 'Must render line 2 at y=180');
+});
+
+test('build4LayerFilterComplex handles multi-segment fast-forward using split and asplit filters', () => {
+    const segments = [
+        { start: 0, end: 5, speed: 1, duration: 5 },
+        { start: 5, end: 15, speed: 3, duration: 10, isFastForward: true },
+        { start: 15, end: 20, speed: 1, duration: 5 },
+    ];
+    const { filterComplex } = build4LayerFilterComplex(segments);
+    assert.ok(filterComplex.includes('[v_composed]split=3[vc0][vc1][vc2]'), 'Must split video stream');
+    assert.ok(filterComplex.includes('[0:a]asplit=3[ac0][ac1][ac2]'), 'Must asplit audio stream');
+    assert.ok(filterComplex.includes('setsar=1'), 'Must normalize SAR to 1');
+    assert.ok(filterComplex.includes('concat=n=3:v=1:a=1'), 'Must concat all 3 segments');
+});
+

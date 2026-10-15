@@ -99,3 +99,87 @@ test('generateSocialMediaCaption procedural: adapts narrative to fast multikills
     assert.ok(aceCaption.includes('ACE histórico') || aceCaption.includes('5 adversários'), 'ACE caption must mention ACE');
 });
 
+test('getTrendingValorantHashtags returns curated list with velocity and views', async () => {
+    const { getTrendingValorantHashtags } = await import('./social-media-agent.js');
+    const allTags = getTrendingValorantHashtags();
+    assert.ok(allTags.length >= 15, 'Must provide at least 15 trending tags');
+    assert.ok(allTags.some(t => t.tag === '#valorant' && t.views));
+    assert.ok(allTags.some(t => t.tag === '#valorantbrasil' && t.tier === 2));
+
+    const tier1 = getTrendingValorantHashtags({ tier: 1 });
+    assert.ok(tier1.every(t => t.tier === 1), 'All filtered tags must be tier 1');
+});
+
+test('buildOptimalHashtags creates high-reach clusters with player tag and clip context', async () => {
+    const { buildOptimalHashtags } = await import('./social-media-agent.js');
+    
+    // ACE on TikTok
+    const tiktokAce = buildOptimalHashtags({ clipType: 'ACE', platform: 'tiktok', playerNick: 'Revenge' });
+    assert.ok(tiktokAce.includes('#valorantbrasil'), 'Must include Brazilian valorant community');
+    assert.ok(tiktokAce.includes('#revenge'), 'Must include player nick');
+    assert.ok(tiktokAce.includes('#valorantace'), 'Must include play type tag');
+    assert.ok(tiktokAce.includes('#fyp') || tiktokAce.includes('#foryou'), 'Must include TikTok discovery tag');
+    assert.ok(tiktokAce.length >= 5 && tiktokAce.length <= 8, 'Must maintain optimal tag count for algorithmic retention');
+
+    // Clutch on Instagram
+    const instaClutch = buildOptimalHashtags({ clipType: 'CLUTCH', platform: 'instagram', playerNick: 'Aspas' });
+    assert.ok(instaClutch.includes('#aspas'), 'Must include custom player tag');
+    assert.ok(instaClutch.includes('#reelsvalorant') || instaClutch.includes('#reels'), 'Must include Instagram reels tag');
+    assert.ok(instaClutch.includes('#valorantclutch'), 'Must include clutch tag');
+
+    // YouTube Shorts 4K
+    const yt4k = buildOptimalHashtags({ clipType: '4K', platform: 'youtube', playerNick: 'Revenge' });
+    assert.ok(yt4k.includes('#shorts') || yt4k.includes('#valorantshorts'), 'Must include YouTube Shorts tag');
+});
+
+test('auditCutWithSocialMediaAI approves high-retention 5v5 cuts (ACE, 4K, 3K) for rendering', async () => {
+    const { auditCutWithSocialMediaAI } = await import('./social-media-agent.js');
+
+    const aceCut = {
+        clipType: 'ACE',
+        startSec: 100,
+        endSec: 122,
+        duration: 22,
+        killsCount: 5,
+        killTimes: [104, 108, 112, 116, 120],
+        gameMode: 'COMPETITIVE_OR_UNRATED',
+    };
+
+    const approval = auditCutWithSocialMediaAI({ cut: aceCut, playerNick: 'Revenge' });
+    assert.strictEqual(approval.status, 'APPROVED', 'ACE 5v5 must be approved');
+    assert.ok(approval.viralScore >= 90, 'ACE must have viral score >= 90');
+    assert.ok(approval.verdict.includes('Aprovado pelo Social Media IA'));
+    assert.strictEqual(approval.checklist.highRetentionPlay, true);
+    assert.strictEqual(approval.checklist.competitiveModeConfirmed, true);
+});
+
+test('auditCutWithSocialMediaAI rejects Mata-Mata cuts and prevents unapproved rendering', async () => {
+    const { auditCutWithSocialMediaAI } = await import('./social-media-agent.js');
+
+    // Mata-Mata por modo explícito
+    const dmCut = {
+        clipType: '3K',
+        startSec: 50,
+        endSec: 70,
+        duration: 20,
+        killsCount: 3,
+        gameMode: 'MATA_MATA',
+    };
+    const dmApproval = auditCutWithSocialMediaAI({ cut: dmCut });
+    assert.strictEqual(dmApproval.status, 'REJECTED', 'Mata-Mata cut must be rejected');
+    assert.ok(dmApproval.verdict.includes('Mata-Mata (Deathmatch)'));
+    assert.strictEqual(dmApproval.checklist.competitiveModeConfirmed, false);
+
+    // Mata-Mata por cadência de respawn (> 6 kills em sequência)
+    const dmStreakCut = {
+        clipType: 'ACE',
+        startSec: 10,
+        endSec: 45,
+        duration: 35,
+        killsCount: 8,
+    };
+    const streakApproval = auditCutWithSocialMediaAI({ cut: dmStreakCut });
+    assert.strictEqual(streakApproval.status, 'REJECTED', 'Streak with > 6 kills must be rejected as Mata-Mata');
+});
+
+

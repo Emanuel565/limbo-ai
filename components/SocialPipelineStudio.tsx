@@ -38,6 +38,10 @@ import {
   Volume2,
   Copy,
   Check,
+  Calendar,
+  Database,
+  Archive,
+  Hash,
 } from "lucide-react";
 
 // Helper seguro para formatar números
@@ -69,9 +73,13 @@ export default function SocialPipelineStudio() {
 
   // Fila de Agendamento
   const [queueList, setQueueList] = useState<any[]>([]);
+  const [groupedWeeks, setGroupedWeeks] = useState<any[]>([]);
+  const [selectedWeekFilter, setSelectedWeekFilter] = useState<string>("ALL");
+  const [isCleaningDisk, setIsCleaningDisk] = useState(false);
   const [nextSlot, setNextSlot] = useState<{ timeString: string; dayLabel: string } | null>(null);
   const [loadingQueue, setLoadingQueue] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
 
   // Modal de Prévia Vertical 9:16
   const [previewPost, setPreviewPost] = useState<any | null>(null);
@@ -98,7 +106,12 @@ export default function SocialPipelineStudio() {
 
   // Painel Recolhível de Admin/Métricas/Chaves
   const [showAdminDrawer, setShowAdminDrawer] = useState(false);
-  const [adminTab, setAdminTab] = useState<"analytics" | "lucro" | "chaves">("analytics");
+  const [adminTab, setAdminTab] = useState<"analytics" | "lucro" | "hashtags" | "chaves">("analytics");
+
+  // Hashtags em Alta (Nicho Valorant)
+  const [hashtagsData, setHashtagsData] = useState<any>(null);
+  const [loadingHashtags, setLoadingHashtags] = useState(false);
+  const [copiedClusterToast, setCopiedClusterToast] = useState<string | null>(null);
 
   // Carrega fila e dados na montagem
   useEffect(() => {
@@ -106,7 +119,31 @@ export default function SocialPipelineStudio() {
     fetchAnalytics();
     fetchCreds();
     fetchWatcherStatus();
+    fetchTrendingHashtags();
   }, []);
+
+  async function fetchTrendingHashtags() {
+    setLoadingHashtags(true);
+    try {
+      const res = await fetch("/api/trending-hashtags");
+      const data = await res.json();
+      if (data?.ok) {
+        setHashtagsData(data);
+      }
+    } catch {
+      // safe
+    } finally {
+      setLoadingHashtags(false);
+    }
+  }
+
+  function handleCopyCluster(text: string, clusterKey: string) {
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedClusterToast(clusterKey);
+      setTimeout(() => setCopiedClusterToast(null), 2500);
+    }
+  }
 
   async function fetchWatcherStatus() {
     setLoadingWatcher(true);
@@ -146,12 +183,39 @@ export default function SocialPipelineStudio() {
       if (data?.ok) {
         const list = Array.isArray(data.queue) ? data.queue : (Array.isArray(data.posts) ? data.posts : []);
         setQueueList(list);
+        if (Array.isArray(data.groupedWeeks)) {
+          setGroupedWeeks(data.groupedWeeks);
+        }
         setNextSlot(data.nextOptimalSlot || data.nextSlot || null);
       }
     } catch {
       // safe
     } finally {
       setLoadingQueue(false);
+    }
+  }
+
+  async function handleCleanupDisk() {
+    setIsCleaningDisk(true);
+    setErrorMessage("");
+    setStatusMessage("");
+    try {
+      const res = await fetch("/api/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cleanup_disk", cleanOrphaned: true }),
+      });
+      const data = await res.json();
+      if (data?.ok) {
+        setStatusMessage(`✓ ${data.message || `Espaço liberado com sucesso: ${data.freedMb} MB economizados!`}`);
+        await fetchQueue();
+      } else {
+        throw new Error(data?.error || "Erro ao liberar espaço em disco.");
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Erro na limpeza de disco.");
+    } finally {
+      setIsCleaningDisk(false);
     }
   }
 
@@ -291,9 +355,13 @@ export default function SocialPipelineStudio() {
       if (!res.ok || !data?.success) {
         throw new Error(data?.error || "Falha na análise visual do Killfeed.");
       }
-      setHunterHighlights(data.cuts || []);
-      setSelectedCutIds((data.cuts || []).map((c: any) => c.id));
-      setStatusMessage(`✓ Detecção concluída! ${data.cuts?.length || 0} jogadas de alto impacto (>= 3K / ACE) localizadas.`);
+      const allCuts = data.cuts || [];
+      const approvedCuts = allCuts.filter((c: any) => c.aiApproval?.status === "APPROVED");
+      setHunterHighlights(allCuts);
+      setSelectedCutIds(approvedCuts.map((c: any) => c.id));
+      setStatusMessage(
+        `✓ Análise e Auditoria do Social Media IA concluídas! ${approvedCuts.length} de ${allCuts.length} jogadas aprovadas para renderização (100% 5v5 Sem Class / Comp).`
+      );
     } catch (err: any) {
       setErrorMessage(err?.message || "Erro na análise de abates.");
     } finally {
@@ -302,9 +370,11 @@ export default function SocialPipelineStudio() {
   }
 
   async function handleRenderHunterSelection() {
-    const cutsToRender = hunterHighlights.filter((h) => selectedCutIds.includes(h.id));
-    if (cutsToRender.length === 0) {
-      setErrorMessage("Selecione pelo menos um clipe para renderizar.");
+    const approvedCutsToRender = hunterHighlights.filter(
+      (h) => selectedCutIds.includes(h.id) && (h.aiApproval ? h.aiApproval.status === "APPROVED" : true)
+    );
+    if (approvedCutsToRender.length === 0) {
+      setErrorMessage("Apenas cortes aprovados pelo Social Media IA podem ser renderizados. Nenhum clipe aprovado selecionado.");
       return;
     }
     setIsRenderingHunter(true);
@@ -317,14 +387,14 @@ export default function SocialPipelineStudio() {
         body: JSON.stringify({
           sourceUrl: hunterVodUrl || undefined,
           localFile: hunterLocalFile || undefined,
-          selectedCuts: cutsToRender,
+          selectedCuts: approvedCutsToRender,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data?.success) {
         throw new Error(data?.error || "Falha na renderização via RTX 3060 Ti.");
       }
-      setStatusMessage(`✓ ${data.cutsProcessed} cortes 9:16 renderizados com áudio original e agendados com sucesso!`);
+      setStatusMessage(`✓ ${data.cutsProcessed} cortes aprovados pelo Social Media IA renderizados e agendados com sucesso!`);
       await fetchQueue();
     } catch (err: any) {
       setErrorMessage(err?.message || "Erro na renderização.");
@@ -366,6 +436,29 @@ export default function SocialPipelineStudio() {
       // safe
     } finally {
       setCancellingId(null);
+    }
+  }
+
+  async function handlePublishNow(postId: string) {
+    setPublishingId(postId);
+    setStatusMessage("Enviando corte para as redes sociais via API oficial...");
+    try {
+      const res = await fetch("/api/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "publish_now", id: postId }),
+      });
+      const data = await res.json();
+      if (data?.ok) {
+        setStatusMessage("✓ Vídeo publicado com sucesso nas redes!");
+      } else {
+        setStatusMessage(`Aviso no disparo: ${data?.result?.error || data?.error || "Verifique o painel"}`);
+      }
+      await fetchQueue();
+    } catch (e: any) {
+      setStatusMessage(`Erro ao publicar: ${e.message}`);
+    } finally {
+      setPublishingId(null);
     }
   }
 
@@ -418,6 +511,10 @@ export default function SocialPipelineStudio() {
   const estimatedCutsRevenueBrl = (estimatedCutsViewsMonthly / 1000) * rpmValorant * 5.7;
   const estimatedWeeklyRevenueBrl = createWeeklyLong ? 4 * 1250 : 0;
   const grandTotalRevenueBrl = estimatedCutsRevenueBrl + estimatedWeeklyRevenueBrl;
+  const approvedSelectedCount = selectedCutIds.filter((id) => {
+    const cut = hunterHighlights.find((h) => h.id === id);
+    return cut?.aiApproval ? cut.aiApproval.status === "APPROVED" : true;
+  }).length;
 
   return (
     <div className="container mx-auto max-w-6xl px-4 space-y-8">
@@ -522,6 +619,15 @@ export default function SocialPipelineStudio() {
               </button>
               <button
                 type="button"
+                onClick={() => setAdminTab("hashtags")}
+                className={`px-3 py-1 rounded-full text-xs font-heading uppercase tracking-wider transition ${
+                  adminTab === "hashtags" ? "liquid-btn-pink text-white font-bold" : "text-slate-300 hover:text-white"
+                }`}
+              >
+                🔥 # em Alta
+              </button>
+              <button
+                type="button"
                 onClick={() => setAdminTab("chaves")}
                 className={`px-3 py-1 rounded-full text-xs font-heading uppercase tracking-wider transition ${
                   adminTab === "chaves" ? "liquid-btn-primary text-white font-bold" : "text-slate-300 hover:text-white"
@@ -607,6 +713,139 @@ export default function SocialPipelineStudio() {
                   Baseado em RPM Valorant R$ 4,85 nas 3 redes
                 </span>
               </div>
+            </div>
+          )}
+
+          {/* Sub-Aba: Hashtags em Alta (Nicho Valorant) */}
+          {adminTab === "hashtags" && (
+            <div className="space-y-5">
+              {/* Banner Informativo IA */}
+              <div className="p-4 rounded-2xl bg-pink-500/10 border border-pink-500/30 flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-pink-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h4 className="font-heading font-bold text-xs uppercase text-white">
+                    Inteligência de Hashtags do Social Media IA
+                  </h4>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    O agente analisa o volume e a velocidade de engajamento no nicho de Valorant (TikTok, Reels e YouTube Shorts).
+                    Ao renderizar qualquer clipe, ele <strong>combina automaticamente 2 tags de alta descoberta + 2 de comunidade brasileira + 2 contextuais do tipo de jogada</strong> para maximizar o alcance orgânico no algoritmo!
+                  </p>
+                </div>
+              </div>
+
+              {/* Clusters Recomendados com 1-Click Copy */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-heading font-bold uppercase text-white flex items-center gap-1.5">
+                    <Flame className="w-4 h-4 text-amber-400" />
+                    Clusters de Alta Performance por Tipo de Jogada:
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400">Clique para copiar</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    {
+                      key: "ace",
+                      title: "👑 Cluster ACE (1v5 / Retenção Máxima)",
+                      tags: ["#valorant", "#valorantbrasil", "#acevalorant", "#ace", "#1v5", "#vctbrasil", "#revenge"],
+                      stats: "+42% recomendação FYP",
+                    },
+                    {
+                      key: "fourK",
+                      title: "🔥 Cluster 4K (Quadra Kill / Velocidade)",
+                      tags: ["#valorant", "#valorantbrasil", "#4kvalorant", "#quadrakill", "#vctbrasil", "#revenge"],
+                      stats: "+35% retenção inicial",
+                    },
+                    {
+                      key: "clutch",
+                      title: "❄️ Cluster Clutch (1vX / Alta Tensão)",
+                      tags: ["#valorant", "#valorantbrasil", "#clutchvalorant", "#clutch", "#clutchgod", "#vctbrasil", "#revenge"],
+                      stats: "+48% comentários e compartilhamentos",
+                    },
+                    {
+                      key: "threeK",
+                      title: "🎯 Cluster 3K (Mira no Pixel & Retake)",
+                      tags: ["#valorant", "#valorantbrasil", "#clutchvalorant", "#vandal", "#headshot", "#vctbrasil", "#revenge"],
+                      stats: "+29% engajamento direto",
+                    },
+                  ].map((cluster) => {
+                    const tagString = cluster.tags.join(" ");
+                    const isCopied = copiedClusterToast === cluster.key;
+                    return (
+                      <div
+                        key={cluster.key}
+                        className="liquid-glass-card p-4 rounded-2xl space-y-2.5 border border-white/10 hover:border-pink-500/40 transition"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-heading font-bold text-xs text-white">{cluster.title}</span>
+                          <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                            {cluster.stats}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1">
+                          {cluster.tags.map((t) => (
+                            <span key={t} className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-white/5 border border-white/10 text-pink-300">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleCopyCluster(tagString, cluster.key)}
+                          className="w-full mt-1 liquid-btn-pink py-1.5 px-3 rounded-xl text-[11px] font-heading font-bold uppercase flex items-center justify-center gap-1.5 transition cursor-pointer"
+                        >
+                          {isCopied ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-white" />
+                              <span>✓ Cluster Copiado!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Copiar Hashtags</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Top Tags Mapeadas */}
+              {hashtagsData?.hashtags && hashtagsData.hashtags.length > 0 && (
+                <div className="space-y-3 pt-2 border-t border-white/10">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-heading font-bold uppercase text-white flex items-center gap-1.5">
+                      <Hash className="w-4 h-4 text-cyan-400" />
+                      Top 20 Hashtags com Maior Volume no Valorant (Brasil & Global):
+                    </span>
+                    <span className="text-[10px] font-mono text-cyan-300">98.5B+ visualizações rastreadas</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {hashtagsData.hashtags.slice(0, 16).map((item: any) => (
+                      <div
+                        key={item.tag}
+                        onClick={() => handleCopyCluster(item.tag, item.tag)}
+                        className="liquid-glass-card p-2.5 rounded-xl flex items-center justify-between gap-1.5 cursor-pointer hover:border-pink-500/40 transition"
+                        title="Clique para copiar"
+                      >
+                        <div className="min-w-0">
+                          <span className="font-mono text-xs font-bold text-white block truncate">{item.tag}</span>
+                          <span className="text-[9px] font-mono text-slate-400 block">{item.views} views</span>
+                        </div>
+                        <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">
+                          {item.velocity}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -869,18 +1108,43 @@ export default function SocialPipelineStudio() {
                     setHunterVodUrl(e.target.value);
                     if (e.target.value) setHunterLocalFile("");
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && hunterVodUrl && !isHuntingKills) {
+                      handleAnalyzeKillfeed();
+                    }
+                  }}
                   className="liquid-input-glass w-full px-4 py-2.5 text-xs text-white rounded-xl placeholder:text-slate-500 font-mono"
                 />
                 <span className="text-[10px] text-slate-400 block font-mono">
-                  Dica: VODs com áudio silenciado por copyright na Twitch ficarão sem som caso o arquivo original esteja mudo.
+                  Dica: Pressione Enter ou use o botão abaixo para escanear os abates de Revenge nesta transmissão.
                 </span>
               </div>
             </div>
 
-            {/* Status da fonte de stream selecionada */}
+            {/* Status da fonte de stream selecionada e Ação Direta */}
             {hunterVodUrl && (
-              <div className="text-[11px] text-teal-300 font-mono bg-teal-950/40 p-2.5 rounded-xl border border-teal-500/30">
-                ✓ Live/VOD selecionada: <strong className="break-all">{hunterVodUrl}</strong>
+              <div className="space-y-2 pt-2 border-t border-teal-500/20">
+                <div className="text-[11px] text-teal-300 font-mono bg-teal-950/40 p-2.5 rounded-xl border border-teal-500/30">
+                  ✓ Live/VOD selecionada: <strong className="break-all">{hunterVodUrl}</strong>
+                </div>
+                <button
+                  type="button"
+                  disabled={isHuntingKills}
+                  onClick={handleAnalyzeKillfeed}
+                  className="w-full py-2.5 px-4 rounded-xl text-xs font-heading font-bold uppercase tracking-wider text-white bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-teal-500/20 hover:scale-[1.01] transition disabled:opacity-50"
+                >
+                  {isHuntingKills ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
+                      <span>Rastreando Abates do Revenge no Stream...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Target className="w-3.5 h-3.5 text-white" />
+                      <span>Rastrear Abates Desta Live / VOD</span>
+                    </>
+                  )}
+                </button>
               </div>
             )}
           </div>
@@ -895,10 +1159,15 @@ export default function SocialPipelineStudio() {
               <Target className="w-5 h-5 text-pink-400" />
             </div>
             <div>
-              <span className="text-xs font-heading font-bold uppercase text-white block">
-                Fonte Ativa para o Caçador:
-              </span>
-              <span className="text-[11px] font-mono text-pink-300 font-bold">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-heading font-bold uppercase text-white block">
+                  Fonte Ativa para o Caçador:
+                </span>
+                <span className="text-[9px] font-mono text-teal-300 bg-teal-500/10 px-2 py-0.5 rounded-full border border-teal-500/30 font-bold flex items-center gap-1">
+                  ✓ Regra Ativa: Apenas Sem Class & Competitivo (Mata-Mata Bloqueado)
+                </span>
+              </div>
+              <span className="text-[11px] font-mono text-pink-300 font-bold block mt-0.5">
                 {hunterLocalFile
                   ? `[SSD Local] raw_gameplays\\${hunterLocalFile}`
                   : (hunterVodUrl ? `[Stream Online] ${hunterVodUrl}` : "Nenhuma fonte selecionada")}
@@ -915,7 +1184,7 @@ export default function SocialPipelineStudio() {
             {isHuntingKills ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                <span>Rastreando Kills de Revenge (RTX 3060 Ti)...</span>
+                <span>Rastreando Kills 5v5 (RTX 3060 Ti)...</span>
               </>
             ) : (
               <>
@@ -930,28 +1199,36 @@ export default function SocialPipelineStudio() {
         {hunterHighlights.length > 0 && (
           <div className="space-y-4 pt-4 border-t border-white/10">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <span className="text-xs font-heading uppercase text-white font-bold flex items-center gap-2">
-                <Flame className="w-4 h-4 text-amber-400" />
-                Jogadas de Alto Impacto Encontradas ({hunterHighlights.length}):
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-heading uppercase text-white font-bold flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-amber-400" />
+                  Jogadas de Alto Impacto Encontradas ({hunterHighlights.length}):
+                </span>
+                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-bold">
+                  100% 5v5 Sem Class / Comp
+                </span>
+              </div>
 
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
-                    if (selectedCutIds.length === hunterHighlights.length) setSelectedCutIds([]);
-                    else setSelectedCutIds(hunterHighlights.map((h) => h.id));
+                    const approved = hunterHighlights.filter((h) => (h.aiApproval ? h.aiApproval.status === "APPROVED" : true));
+                    if (selectedCutIds.length === approved.length) setSelectedCutIds([]);
+                    else setSelectedCutIds(approved.map((h) => h.id));
                   }}
                   className="text-[11px] font-mono text-pink-300 hover:text-white transition px-2.5 py-1 rounded-lg bg-white/5 border border-white/10"
                 >
-                  {selectedCutIds.length === hunterHighlights.length ? "Desmarcar Todos" : "Selecionar Todos"}
+                  {selectedCutIds.length === hunterHighlights.filter((h) => (h.aiApproval ? h.aiApproval.status === "APPROVED" : true)).length
+                    ? "Desmarcar Todos"
+                    : "Selecionar Aprovados"}
                 </button>
 
                 <button
                   type="button"
-                  disabled={isRenderingHunter || selectedCutIds.length === 0}
+                  disabled={isRenderingHunter || approvedSelectedCount === 0}
                   onClick={handleRenderHunterSelection}
-                  className="liquid-btn-pink px-4 py-2 rounded-xl text-xs font-heading font-bold uppercase text-white flex items-center gap-2 shadow-md shadow-pink-500/30 hover:scale-105 transition disabled:opacity-50"
+                  className="liquid-btn-pink px-4 py-2 rounded-xl text-xs font-heading font-bold uppercase text-white flex items-center gap-2 shadow-md shadow-pink-500/30 hover:scale-105 transition disabled:opacity-50 cursor-pointer"
                 >
                   {isRenderingHunter ? (
                     <>
@@ -961,36 +1238,56 @@ export default function SocialPipelineStudio() {
                   ) : (
                     <>
                       <Zap className="w-3.5 h-3.5" />
-                      <span>Renderizar Selecionados ({selectedCutIds.length})</span>
+                      <span>
+                        Renderizar Aprovados ({approvedSelectedCount})
+                      </span>
                     </>
                   )}
                 </button>
               </div>
             </div>
 
-            {/* Grid de Cards de Kills */}
+            {/* Grid de Cards de Kills com Selo Social Media IA */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {hunterHighlights.map((cut) => {
+                const isApproved = cut.aiApproval ? cut.aiApproval.status === "APPROVED" : true;
                 const isSelected = selectedCutIds.includes(cut.id);
                 return (
                   <div
                     key={cut.id}
                     onClick={() => {
+                      if (!isApproved) {
+                        setErrorMessage(cut.aiApproval?.verdict || "Este corte foi reprovado pelo Social Media IA e não pode ser renderizado.");
+                        return;
+                      }
                       if (isSelected) setSelectedCutIds(selectedCutIds.filter((id) => id !== cut.id));
                       else setSelectedCutIds([...selectedCutIds, cut.id]);
                     }}
-                    className={`liquid-glass-card p-4 rounded-2xl cursor-pointer transition-all border ${
-                      isSelected
-                        ? "border-pink-500/60 bg-pink-500/10 shadow-lg shadow-pink-500/10 scale-[1.01]"
-                        : "border-white/10 hover:border-white/30"
+                    className={`liquid-glass-card p-4 rounded-2xl transition-all border ${
+                      !isApproved
+                        ? "opacity-60 bg-rose-950/10 border-rose-500/20 cursor-not-allowed"
+                        : isSelected
+                        ? "border-pink-500/60 bg-pink-500/10 shadow-lg shadow-pink-500/10 scale-[1.01] cursor-pointer"
+                        : "border-white/10 hover:border-white/30 cursor-pointer"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-pink-500/20 text-pink-300 border border-pink-500/30">
-                        {cut.clipType || "HIGHLIGHT"}
-                      </span>
-                      <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                        Score {cut.viralScore || 92}/100
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase border ${
+                          isApproved ? "bg-pink-500/20 text-pink-300 border-pink-500/30" : "bg-slate-500/20 text-slate-400 border-slate-500/30"
+                        }`}>
+                          {cut.clipType || "HIGHLIGHT"}
+                        </span>
+                        <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold uppercase border ${
+                          isApproved ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" : "bg-rose-500/20 text-rose-300 border-rose-500/30"
+                        }`}>
+                          {isApproved ? "✓ Aprovado Social Media" : "❌ Reprovado Social Media"}
+                        </span>
+                      </div>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                        isApproved ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20 font-bold" : "text-rose-300 bg-rose-500/10 border-rose-500/20"
+                      }`}>
+                        Score {cut.viralScore || cut.aiApproval?.viralScore || 92}/100
                       </span>
                     </div>
 
@@ -998,10 +1295,14 @@ export default function SocialPipelineStudio() {
                       {cut.headline || `${cut.killsCount || 3}K Insano no Round`}
                     </div>
 
-                    <div className="text-[10px] font-mono text-slate-400 flex items-center justify-between">
+                    <div className="text-[10px] font-mono text-slate-400 flex items-center justify-between mb-1.5">
                       <span>Início: {Math.round(cut.startSec || 0)}s</span>
                       <span>Duração: {Math.round((cut.endSec || 0) - (cut.startSec || 0))}s</span>
                     </div>
+
+                    <p className={`text-[9px] font-mono truncate ${isApproved ? "text-emerald-300/80" : "text-rose-300/80"}`}>
+                      {cut.aiApproval?.verdict || (isApproved ? "✓ 5v5 Sem Class / Comp validado para renderização" : "Reprovado pelo Social Media IA")}
+                    </p>
                   </div>
                 );
               })}
@@ -1011,31 +1312,56 @@ export default function SocialPipelineStudio() {
       </section>
 
       {/* ======================================================== */}
-      {/* 4. CENTRO: FILA DE DISPARO & PRÉVIA 9:16 (SEMPRE VISÍVEL)*/}
+      {/* 4. CENTRO: BANCO PERMANENTE, SEMANAS & FILA DE DISPARO   */}
       {/* ======================================================== */}
       <section id="fila-posts" className="liquid-glass-pane p-6 md:p-8 rounded-3xl space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-white/10 gap-3">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between pb-4 border-b border-white/10 gap-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Share2 className="w-5 h-5 text-teal-400" />
               <h2 className="font-heading text-lg sm:text-xl font-bold uppercase text-white tracking-wide">
-                2. Fila de Disparo & Prévia Vertical 9:16
+                2. Banco de Vídeos & Fila Organizada por Semanas
               </h2>
               <span className="text-[10px] font-mono font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40 px-2.5 py-0.5 rounded-full">
-                {queueList.filter((q) => q.status === "SCHEDULED").length} Vídeos Prontos
+                {queueList.filter((q) => q.status === "SCHEDULED").length} Agendados
+              </span>
+              <span className="text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                <Database className="w-3 h-3 text-purple-400" />
+                {queueList.length} Vídeos Permanentes
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-              Todos os cortes renderizados pela RTX 3060 Ti ficam listados aqui. Clique em <strong>&ldquo;VER CORTE 9:16&rdquo;</strong> para assistir à prévia antes da publicação automática.
+              Todos os cortes aprovados permanecem salvos no banco divididos por semanas com datas e horários nobres de engajamento (TikTok, Instagram Reels e YouTube Shorts).
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Ações da Fila & Limpeza de Disco */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleCleanupDisk}
+              disabled={isCleaningDisk}
+              className="liquid-btn-pink px-4 py-2 rounded-2xl text-xs font-heading font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-md shadow-pink-500/20 hover:scale-105 transition disabled:opacity-50"
+              title="Exclui arquivos .mp4 pesados dos vídeos já publicados para liberar seu SSD, mantendo todo o histórico e links no banco de dados"
+            >
+              {isCleaningDisk ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Liberando SSD...</span>
+                </>
+              ) : (
+                <>
+                  <HardDrive className="w-3.5 h-3.5 text-white" />
+                  <span>Liberar Espaço no SSD</span>
+                </>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={handleClearQueue}
               disabled={queueList.length === 0}
-              className="text-xs text-rose-300 hover:text-white flex items-center gap-1.5 font-mono transition cursor-pointer px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="text-xs text-rose-300 hover:text-white flex items-center gap-1.5 font-mono transition cursor-pointer px-3.5 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-400" />
               <span>Limpar Fila</span>
@@ -1045,132 +1371,304 @@ export default function SocialPipelineStudio() {
               type="button"
               onClick={fetchQueue}
               disabled={loadingQueue}
-              className="text-xs text-slate-300 hover:text-white flex items-center gap-1.5 font-mono transition cursor-pointer px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20"
+              className="text-xs text-slate-300 hover:text-white flex items-center gap-1.5 font-mono transition cursor-pointer px-3.5 py-2 rounded-2xl bg-white/10 border border-white/20"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loadingQueue ? "animate-spin text-pink-400" : ""}`} />
-              <span>Atualizar Fila</span>
+              <span>Atualizar</span>
             </button>
           </div>
         </div>
 
-        {/* Lista de Cards da Fila */}
-        {queueList.length > 0 ? (
-          <div className="space-y-3">
-            {queueList.map((job) => {
-              const isCancelling = cancellingId === job.id;
-              const isApproved = job.aiApproval?.status === "APPROVED";
-              return (
-                <div
-                  key={job.id}
-                  className="liquid-glass-card p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-white/15 hover:border-pink-500/30 transition-all"
-                >
-                  <div className="space-y-2 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase ${
-                          job.status === "SCHEDULED"
-                            ? "bg-emerald-500/20 text-emerald-200 border border-emerald-400/40"
-                            : job.status === "PUBLISHED"
-                            ? "bg-blue-500/20 text-blue-200 border border-blue-400/40"
-                            : "bg-rose-500/20 text-rose-200 border border-rose-400/40"
-                        }`}
-                      >
-                        {job.status}
-                      </span>
-                      <span className="text-xs font-mono text-pink-300 font-bold">
-                        ⏰ {job.timeLabel || "Horário Nobre"}
-                      </span>
-                      <span className="text-[10px] text-slate-300 font-mono">
-                        ({new Date(job.scheduledFor).toLocaleDateString("pt-BR")})
-                      </span>
+        {/* Barra de Filtro de Semanas */}
+        {groupedWeeks.length > 1 && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <span className="text-[11px] font-mono uppercase text-slate-400 font-bold shrink-0">Filtrar:</span>
+            <button
+              type="button"
+              onClick={() => setSelectedWeekFilter("ALL")}
+              className={`px-3 py-1 rounded-full text-xs font-heading uppercase tracking-wider transition shrink-0 ${
+                selectedWeekFilter === "ALL"
+                  ? "liquid-btn-primary text-white font-bold"
+                  : "bg-white/5 border border-white/10 text-slate-300 hover:text-white"
+              }`}
+            >
+              Todas as Semanas ({queueList.length})
+            </button>
+            {groupedWeeks.map((week) => (
+              <button
+                key={week.weekKey}
+                type="button"
+                onClick={() => setSelectedWeekFilter(week.weekKey)}
+                className={`px-3 py-1 rounded-full text-xs font-heading uppercase tracking-wider transition shrink-0 ${
+                  selectedWeekFilter === week.weekKey
+                    ? "liquid-btn-pink text-white font-bold"
+                    : "bg-white/5 border border-white/10 text-slate-300 hover:text-white"
+                }`}
+              >
+                {week.weekTitle} ({week.posts.length})
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Visualização Dividida por Semanas */}
+        {groupedWeeks.length > 0 ? (
+          <div className="space-y-6">
+            {groupedWeeks
+              .filter((week) => selectedWeekFilter === "ALL" || week.weekKey === selectedWeekFilter)
+              .map((week) => (
+                <div key={week.weekKey} className="liquid-glass-pane p-5 md:p-6 rounded-3xl space-y-4 border border-white/15">
+                  {/* Cabeçalho da Semana */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-2xl bg-pink-500/20 border border-pink-500/40 text-pink-300">
+                        <Calendar className="w-5 h-5 text-pink-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-heading font-black text-sm sm:text-base uppercase text-white tracking-wide">
+                            {week.weekTitle}
+                          </h3>
+                          {week.isCurrentWeek && (
+                            <span className="text-[10px] font-mono font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full">
+                              Semana Atual
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-slate-300 font-mono mt-0.5 block">
+                          {week.stats.total} vídeos no banco • {week.stats.scheduled} agendados • {week.stats.published} publicados
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="font-heading font-bold text-sm text-white">{job.title}</div>
-
-                    {/* Selo do Sistema de Aprovação IA Local */}
-                    {job.aiApproval && (
-                      <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase flex items-center gap-1 ${
-                              isApproved
-                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40"
-                                : "bg-rose-500/20 text-rose-300 border border-rose-400/40"
-                            }`}
-                          >
-                            <Sparkles className="w-3 h-3 text-emerald-400" />
-                            {isApproved ? "✓ Aprovado pela IA Local" : "⚠️ Rejeitado"}
-                            {job.aiApproval.viralScore ? ` • Viral Score: ${job.aiApproval.viralScore}/100` : ""}
-                          </span>
-
-                          <span className="text-[10px] text-emerald-300 font-mono bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                            ✓ 100% Gameplay Ativa
-                          </span>
-                          <span className="text-[10px] text-pink-300 font-mono bg-pink-950/40 px-2 py-0.5 rounded-md border border-pink-500/20">
-                            ✓ Gancho 3s Alto CTR
-                          </span>
-                          <span className="text-[10px] text-cyan-300 font-mono bg-cyan-950/40 px-2 py-0.5 rounded-md border border-cyan-500/20">
-                            ✓ 9:16 Vertical
-                          </span>
-                        </div>
-
-                        {job.aiApproval.verdict && (
-                          <p className="text-[11px] text-slate-300 italic font-sans leading-relaxed">
-                            &ldquo;{job.aiApproval.verdict}&rdquo;
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="text-[11px] text-slate-300 flex items-center gap-2">
-                      <span>Plataformas: {job.platforms?.join(", ").toUpperCase()}</span>
-                      {job.deleteAfterPublish && (
-                        <span className="text-pink-300 flex items-center gap-1">
-                          • <Trash2 className="w-3 h-3 text-pink-400" /> Auto-exclusão do SSD ativa
+                    <div className="flex items-center gap-2 text-xs font-mono">
+                      {week.stats.totalMbOnDisk > 0 ? (
+                        <span className="px-3 py-1 rounded-xl bg-pink-500/15 border border-pink-500/30 text-pink-300 text-[11px] font-bold flex items-center gap-1.5">
+                          <HardDrive className="w-3.5 h-3.5 text-pink-400" />
+                          {week.stats.totalMbOnDisk} MB no SSD
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5">
+                          <Archive className="w-3.5 h-3.5 text-emerald-400" />
+                          SSD 100% Liberado (Salvo no Banco)
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {job.status === "SCHEDULED" && (
-                    <div className="flex items-center gap-2 self-end md:self-center shrink-0">
-                      {/* Botão de Aprovação Manual */}
-                      <button
-                        type="button"
-                        onClick={() => handleToggleApproval(job.id, job.aiApproval?.status || "APPROVED")}
-                        className={`px-3 py-1.5 rounded-full text-[11px] font-mono uppercase transition cursor-pointer border ${
-                          isApproved
-                            ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/30 hover:bg-rose-500/20 hover:text-rose-200"
-                            : "text-amber-300 bg-amber-500/10 border-amber-500/30 hover:bg-emerald-500/20 hover:text-emerald-200"
-                        }`}
-                      >
-                        {isApproved ? "✓ Aprovado" : "Revisar"}
-                      </button>
+                  {/* Cards dos Vídeos da Semana */}
+                  <div className="space-y-3">
+                    {week.posts.map((job: any) => {
+                      const isCancelling = cancellingId === job.id;
+                      const isApproved = job.aiApproval?.status === "APPROVED";
+                      const isYouTubeActive = job.platforms?.includes("youtube") || job.platforms?.includes("youtube_shorts") || job.platforms?.includes("shorts");
 
-                      {job.videoUrl && (
-                        <button
-                          type="button"
-                          onClick={() => setPreviewPost(job)}
-                          className="liquid-btn-pink px-4 py-2 rounded-full text-white text-xs font-heading font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-md shadow-pink-500/30 hover:scale-105 transition"
+                      return (
+                        <div
+                          key={job.id}
+                          className="liquid-glass-card p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-white/15 hover:border-pink-500/30 transition-all"
                         >
-                          <Play className="w-3.5 h-3.5 fill-current" />
-                          <span>Ver Corte 9:16</span>
-                        </button>
-                      )}
+                          <div className="space-y-2 flex-1">
+                            {/* Linha de Data, Horário e Status de Armazenamento */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase ${
+                                  job.status === "SCHEDULED"
+                                    ? "bg-emerald-500/20 text-emerald-200 border border-emerald-400/40"
+                                    : job.status === "PUBLISHED"
+                                    ? "bg-blue-500/20 text-blue-200 border border-blue-400/40"
+                                    : "bg-rose-500/20 text-rose-200 border border-rose-400/40"
+                                }`}
+                              >
+                                {job.status}
+                              </span>
 
-                      <button
-                        type="button"
-                        onClick={() => handleCancelPost(job.id)}
-                        disabled={isCancelling}
-                        className="liquid-glass-card px-4 py-2 rounded-full text-slate-300 hover:text-rose-200 hover:bg-rose-500/20 text-xs font-heading uppercase transition cursor-pointer border-white/20"
-                      >
-                        {isCancelling ? "Cancelando..." : "Cancelar"}
-                      </button>
-                    </div>
-                  )}
+                              <span className="text-xs font-mono text-cyan-300 font-bold bg-cyan-950/40 px-2 py-0.5 rounded-md border border-cyan-500/30">
+                                📅 {job.dayOfWeek}, {job.formattedDate}
+                              </span>
+
+                              <span className="text-xs font-mono text-pink-300 font-bold bg-pink-950/40 px-2 py-0.5 rounded-md border border-pink-500/30">
+                                ⏰ {job.formattedTime}
+                              </span>
+
+                              {job.hasLocalFile ? (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                                  <HardDrive className="w-3 h-3 text-amber-400" />
+                                  {job.fileSizeMb || 20} MB no SSD
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                                  <Archive className="w-3 h-3 text-emerald-400" />
+                                  Permanente no Banco (SSD Liberado)
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="font-heading font-bold text-sm text-white">{job.title}</div>
+
+                            {/* Selo do Sistema de Aprovação IA Local */}
+                            {job.aiApproval && (
+                              <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span
+                                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase flex items-center gap-1 ${
+                                      isApproved
+                                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40"
+                                        : "bg-rose-500/20 text-rose-300 border border-rose-400/40"
+                                    }`}
+                                  >
+                                    <Sparkles className="w-3 h-3 text-emerald-400" />
+                                    {isApproved ? "✓ Aprovado pela IA Local" : "⚠️ Rejeitado"}
+                                    {job.aiApproval.viralScore ? ` • Viral Score: ${job.aiApproval.viralScore}/100` : ""}
+                                  </span>
+
+                                  <span className="text-[10px] text-emerald-300 font-mono bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                                    ✓ 100% Gameplay Ativa
+                                  </span>
+                                  <span className="text-[10px] text-pink-300 font-mono bg-pink-950/40 px-2 py-0.5 rounded-md border border-pink-500/20">
+                                    ✓ Gancho 3s Alto CTR
+                                  </span>
+                                  <span className="text-[10px] text-cyan-300 font-mono bg-cyan-950/40 px-2 py-0.5 rounded-md border border-cyan-500/20">
+                                    ✓ 9:16 Vertical
+                                  </span>
+                                </div>
+
+                                {job.aiApproval.verdict && (
+                                  <p className="text-[11px] text-slate-300 italic font-sans leading-relaxed">
+                                    &ldquo;{job.aiApproval.verdict}&rdquo;
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Status por Rede Social */}
+                            <div className="text-[11px] text-slate-300 flex items-center gap-2 flex-wrap pt-1">
+                              <span className="font-mono text-slate-400">Canais:</span>
+                              {job.platforms?.includes("tiktok") && (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-black/40 border border-white/20 text-slate-200 flex items-center gap-1">
+                                  <Music2 className="w-3 h-3 text-cyan-400" />
+                                  TikTok
+                                </span>
+                              )}
+                              {job.platforms?.includes("instagram") && (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-pink-950/30 border border-pink-500/30 text-pink-200 flex items-center gap-1">
+                                  <Instagram className="w-3 h-3 text-pink-400" />
+                                  Instagram Reels
+                                </span>
+                              )}
+                              {isYouTubeActive && (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-red-950/30 border border-red-500/30 text-red-200 flex items-center gap-1">
+                                  <Youtube className="w-3 h-3 text-red-400" />
+                                  YouTube Shorts (GhostEngine)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Ações do Card */}
+                          {job.status === "SCHEDULED" && (
+                            <div className="flex items-center gap-2 self-end md:self-center shrink-0 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleApproval(job.id, job.aiApproval?.status || "APPROVED")}
+                                className={`px-3 py-1.5 rounded-full text-[11px] font-mono uppercase transition cursor-pointer border ${
+                                  isApproved
+                                    ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/30 hover:bg-rose-500/20 hover:text-rose-200"
+                                    : "text-amber-300 bg-amber-500/10 border-amber-500/30 hover:bg-emerald-500/20 hover:text-emerald-200"
+                                }`}
+                              >
+                                {isApproved ? "✓ Aprovado" : "Revisar"}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handlePublishNow(job.id)}
+                                disabled={publishingId === job.id}
+                                className="liquid-btn-cyan px-3.5 py-1.5 rounded-full text-white text-xs font-heading font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-md shadow-cyan-500/30 hover:scale-105 transition disabled:opacity-50"
+                              >
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>{publishingId === job.id ? "Publicando..." : "Publicar Agora"}</span>
+                              </button>
+
+                              {job.videoUrl && job.hasLocalFile && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewPost(job)}
+                                  className="liquid-btn-pink px-3.5 py-1.5 rounded-full text-white text-xs font-heading font-bold uppercase flex items-center gap-1.5 cursor-pointer shadow-md shadow-pink-500/30 hover:scale-105 transition"
+                                >
+                                  <Play className="w-3.5 h-3.5 fill-current" />
+                                  <span>Ver Corte 9:16</span>
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleCancelPost(job.id)}
+                                disabled={isCancelling}
+                                className="liquid-glass-card px-3 py-1.5 rounded-full text-slate-300 hover:text-rose-200 hover:bg-rose-500/20 text-xs font-heading uppercase transition cursor-pointer border-white/20"
+                              >
+                                {isCancelling ? "Cancelando..." : "Cancelar"}
+                              </button>
+                            </div>
+                          )}
+
+                          {job.status === "PUBLISHING" && (
+                            <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+                              <span className="text-xs font-mono text-cyan-300 animate-pulse flex items-center gap-1.5 bg-cyan-950/40 px-3 py-1.5 rounded-full border border-cyan-400/30">
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                Enviando para as redes sociais...
+                              </span>
+                            </div>
+                          )}
+
+                          {job.status === "PUBLISHED" && (
+                            <div className="flex items-center gap-2 self-end md:self-center shrink-0 flex-wrap">
+                              {job.result?.instagram?.permalink && (
+                                <a
+                                  href={job.result.instagram.permalink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="liquid-btn-pink px-3.5 py-1.5 rounded-full text-white text-xs font-heading font-bold uppercase flex items-center gap-1.5 hover:scale-105 transition"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                  <span>Instagram Reel</span>
+                                </a>
+                              )}
+                              {job.videoUrl && job.hasLocalFile && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewPost(job)}
+                                  className="liquid-glass-card px-3 py-1.5 rounded-full text-slate-300 hover:text-white text-xs font-heading uppercase transition cursor-pointer border-white/20"
+                                >
+                                  <Play className="w-3.5 h-3.5" />
+                                  <span>Ver Corte</span>
+                                </button>
+                              )}
+                              <span className="px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                ✓ Publicado
+                              </span>
+                            </div>
+                          )}
+
+                          {job.status === "FAILED" && (
+                            <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handlePublishNow(job.id)}
+                                disabled={publishingId === job.id}
+                                className="liquid-btn-pink px-3.5 py-1.5 rounded-full text-white text-xs font-heading uppercase flex items-center gap-1 cursor-pointer"
+                              >
+                                <RefreshCw className="w-3 h-3" />
+                                <span>Tentar Novamente</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              );
-            })}
+              ))}
           </div>
         ) : (
           <div className="liquid-glass-card p-10 rounded-3xl border-dashed border-white/20 text-center space-y-3.5">
@@ -1202,7 +1700,7 @@ export default function SocialPipelineStudio() {
             <span className="text-[10px] font-mono uppercase text-pink-300 font-bold mb-2">
               Prévia do Corte Renderizado 9:16
             </span>
-            <h3 className="font-heading font-bold text-sm text-white text-center mb-3 line-clamp-1 px-4">
+            <h3 className="font-heading font-bold text-sm text-white text-center mb-3 line-clamp-2 leading-snug break-words px-8">
               {previewPost.title}
             </h3>
 

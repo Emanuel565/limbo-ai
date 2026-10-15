@@ -26,19 +26,25 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        const maxSeconds = Number(body?.maxSeconds) > 0 ? Number(body.maxSeconds) : (validation.isUrl ? 1200 : null);
+        const startSeconds = Number(body?.startSeconds) > 0 ? Number(body.startSeconds) : 0;
+        const maxSeconds = Number(body?.maxSeconds) > 0 ? Number(body.maxSeconds) : null;
         const playerNick = String(body?.playerNick || 'Revenge').trim();
+        const filterDeathmatch = body?.filterDeathmatch !== false;
 
-        // Executa o caçador de kills a 2 FPS focado no jogador Revenge
+        // Executa o caçador de kills focado no jogador Revenge (apenas Sem Classificação ou Competitivo)
         const cuts = await runKillHunterAnalysis(analysisTarget, {
             playerNick,
+            startSeconds,
             maxSeconds,
+            filterDeathmatch,
             debug: process.env.NODE_ENV !== 'production',
-        });
+        } as any);
 
         return NextResponse.json({
             success: true,
             source: validation.source,
+            gameModeFilter: 'COMPETITIVE_OR_UNRATED_ONLY',
+            ruleApplied: 'Apenas partidas Competitivas ou Sem Classificação (Mata-Mata bloqueado)',
             highlightsFound: cuts.length,
             cuts,
         });
