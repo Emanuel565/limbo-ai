@@ -393,14 +393,13 @@ def extrair_frame_em_segundo(video_path, seg):
     if not video_path:
         return None
     try:
-        if os.path.exists(str(video_path)):
-            cap = cv2.VideoCapture(str(video_path))
-            if cap.isOpened():
-                cap.set(cv2.CAP_PROP_POS_MSEC, float(seg) * 1000.0)
-                ret, frame = cap.read()
-                cap.release()
-                if ret and frame is not None:
-                    return frame
+        cap = cv2.VideoCapture(str(video_path))
+        if cap.isOpened():
+            cap.set(cv2.CAP_PROP_POS_MSEC, float(seg) * 1000.0)
+            ret, frame = cap.read()
+            cap.release()
+            if ret and frame is not None:
+                return frame
     except Exception:
         pass
 
@@ -409,15 +408,19 @@ def extrair_frame_em_segundo(video_path, seg):
         cmd = [
             ffmpeg_bin,
             '-hide_banner', '-loglevel', 'error',
+        ]
+        if str(video_path).startswith(('http://', 'https://')):
+            cmd.extend(['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5'])
+        cmd.extend([
             '-ss', str(seg),
             '-i', str(video_path),
             '-vframes', '1',
             '-f', 'image2pipe',
             '-vcodec', 'png',
             'pipe:1'
-        ]
+        ])
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        raw, _ = proc.communicate(timeout=6)
+        raw, _ = proc.communicate(timeout=15)
         if raw:
             arr = np.frombuffer(raw, dtype=np.uint8)
             frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
@@ -434,38 +437,51 @@ def classificar_modo_hud(frame):
     (Competitivo / Sem Classificação) ou de Mata-Mata (Deathmatch / TDM).
     
     Critérios Visuais em 1080p:
-    1. Caixinha de Placar Individual de Mata-Mata (X: 875 a 905, Y: 22 a 48):
-       - No Mata-Mata: Existe um bloco preto opaco (< 25) colado ao timer contendo o score
-         individual do jogador, e NUNCA há a placa clara de placar de time do 5v5.
-    2. Barra de Habilidades (X: 860 a 1040, Y: 960 a 1045):
-       - No 5v5: O HUD de habilidades (C, Q, E, X e Ultimate) está sempre presente acima da vida.
-       - No Mata-Mata (FFA): As habilidades são 100% desativadas e removidas da interface.
+    1. Card de Jogador Externo (X: 478..502, Y: 24..48):
+       - No Mata-Mata: Há 12 a 14 jogadores no topo. O 6º jogador da esquerda fica
+         posicionado em X: 420..500 e possui a caixinha preta de pontuação individual.
+       - No 5v5: Existem estritamente 5 jogadores por time (X: 590..865). A região X: 478..502
+         é mundo aberto/céu e NUNCA contém caixinha preta de jogador.
+    2. Barra de Habilidades no rodapé central (X: 800..1120, Y: 960..1070):
+       - No 5v5: Habilidades ativas e contornos estruturados.
+       - No Mata-Mata: Habilidades 100% desativadas e removidas pela Riot.
     """
     if frame is None:
         return 'UNKNOWN'
     h, w = frame.shape[:2]
-    if (w, h) != (1920, 1080):
+    # Se o frame for vertical 9:16 (ex: vídeo já renderizado para Shorts)
+    if h > w:
+        center_y1 = int(round((h - w) / 2.0))
+        center_layer = frame[center_y1:center_y1 + w, 0:w]
+        canvas_16_9 = np.zeros((1080, 1920, 3), dtype=np.uint8)
+        offset_x = int(round((1920 - w) / 2.0))
+        if center_layer.shape[0] != 1080 or center_layer.shape[1] != 1080:
+            center_layer = cv2.resize(center_layer, (1080, 1080))
+        canvas_16_9[:, offset_x:offset_x + 1080] = center_layer
+        frame = canvas_16_9
+    elif (w, h) != (1920, 1080):
         frame = cv2.resize(frame, (1920, 1080), interpolation=cv2.INTER_LINEAR)
 
-    # 1. Checa a caixinha preta do score individual de Deathmatch colada ao cronômetro:
-    box_l = frame[22:48, 875:905]
-    gray_box_l = cv2.cvtColor(box_l, cv2.COLOR_BGR2GRAY)
-    pure_black_ratio = np.count_nonzero(gray_box_l < 25) / gray_box_l.size
+    # 1. Checa a caixinha preta do 6º jogador externo (só existe no Mata-Mata com 12-14 players)
+    sb = frame[24:48, 478:502]
+    gray_sb = cv2.cvtColor(sb, cv2.COLOR_BGR2GRAY)
+    outer_player_black = np.count_nonzero(gray_sb < 25) / gray_sb.size
 
-    # 2. Checa as habilidades no rodapé (desativadas no Deathmatch):
-    abilities_roi = frame[960:1045, 860:1040]
-    gray_ab = cv2.cvtColor(abilities_roi, cv2.COLOR_BGR2GRAY)
-    keybinds_roi = gray_ab[65:85, :]
-    keybind_white = np.count_nonzero(keybinds_roi > 170)
-    
-    ult_roi = gray_ab[45:85, 110:175]
-    ult_edges = cv2.Canny(ult_roi, 40, 120)
-    ult_edge_count = np.count_nonzero(ult_edges)
+    # 2. Checa as habilidades no rodapé central
+    cqex_roi = frame[1040:1070, 800:1120]
+    gray_cqex = cv2.cvtColor(cqex_roi, cv2.COLOR_BGR2GRAY)
+    cqex_white = np.count_nonzero(gray_cqex >= 190)
 
-    # No Deathmatch:
-    # - Há a caixinha preta individual colada ao timer (pure_black_ratio > 0.40)
-    # - E NÃO há keybinds de habilidades nem anel de ultimate (keybind_white < 20 ou ult_edge_count < 180)
-    is_deathmatch = (pure_black_ratio > 0.40) and (keybind_white < 20 or ult_edge_count < 180)
+    qe_roi = frame[920:958, 880:1020]
+    gray_qe = cv2.cvtColor(qe_roi, cv2.COLOR_BGR2GRAY)
+    qe_white = np.count_nonzero(gray_qe >= 200)
+
+    ab_edges = cv2.Canny(frame[960:1040, 800:1120], 50, 150)
+    ab_edge_count = np.count_nonzero(ab_edges)
+
+    # Decisão:
+    # Se há o card do 6º jogador (Mata-Mata) ou ausência completa de habilidades -> MATA_MATA
+    is_deathmatch = (outer_player_black > 0.20) or (cqex_white < 80 and qe_white < 80 and ab_edge_count < 300)
 
     return 'MATA_MATA' if is_deathmatch else 'COMPETITIVE_OR_UNRATED'
 
@@ -503,7 +519,16 @@ def agrupar_highlights(tempos_kills, janela_seg=40, min_kills=3, pre_margin=4.0,
 
     resultados = []
     for idx, c in enumerate(clusters):
+        # Deduplica timestamps da mesma kill que desliza no killfeed (< 1.2s)
+        dedup_c = []
+        for t_k in c:
+            if not dedup_c or (t_k - dedup_c[-1]) >= 1.2:
+                dedup_c.append(t_k)
+        c = dedup_c
         count = len(c)
+
+        if count < min_kills:
+            continue
         
         # 1. Regra de Cadência anti Mata-Mata:
         # No 5v5 existem apenas 5 adversários no time inimigo.
